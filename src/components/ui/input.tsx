@@ -1,0 +1,13 @@
+import { cn } from "@/lib/utils";
+
+export function Input({ className, ...props }: React.ComponentProps<"input">) {
+  return (
+    <input
+      className={cn(
+        "h-11 w-full rounded-[var(--radius-sm)] border border-border bg-surface px-3 text-sm text-fg placeholder:text-subtle outline-none transition-colors focus-visible:border-border-strong focus-visible:ring-2 focus-visible:ring-primary/40",
+        className,
+      )}
+      {...props}
+    />
+  );
+}

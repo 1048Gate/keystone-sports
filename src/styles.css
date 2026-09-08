@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #f3efe6;
+  --color-surface: #fffcf6;
+  --color-elevated: #e8e2d6;
+  --color-fg: #14181f;
+  --color-muted: #5c5852;
+  --color-subtle: #8a847a;
+  --color-primary: #102036;
+  --color-primary-fg: #f3efe6;
+  --color-accent: #c81e2b;
+  --color-accent-fg: #fff7f6;
+  --color-scoreboard: #102036;
+  --color-scoreboard-fg: #f3efe6;
+  --color-border: color-mix(in oklab, #14181f 12%, transparent);
+  --color-border-strong: color-mix(in oklab, #14181f 22%, transparent);
+  --color-ok: #2f7d56;
+  --color-warn: #b5791c;
+  --color-danger: #c81e2b;
+  --color-live: #c81e2b;
+  --color-live-fg: #fff7f6;
+  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Oswald", "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 18px;
+  --shadow-border: 0 0 0 1px rgba(20, 24, 31, 0.08), 0 1px 2px -1px rgba(20, 24, 31, 0.06);
+  --shadow-border-hover: 0 0 0 1px rgba(20, 24, 31, 0.14), 0 2px 8px -2px rgba(20, 24, 31, 0.08);
+}
+
+@layer base {
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-accent) 28%, transparent);
+  }
+
+  img {
+    outline: 1px solid rgba(20, 24, 31, 0.08);
+    outline-offset: -1px;
+  }
+
+  img[data-logo] {
+    outline: none;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.live-dot {
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+button:focus-visible, a:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 3px; }
+@media (max-width: 639px) {
+  .home-summary h1 { font-size: 1.5rem; line-height: 1.25; }
+  .home-summary article { padding: 0.75rem; }
+  .home-summary article img { width: 1.75rem; height: 1.75rem; }
+  .home-summary article .space-y-3 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .home-summary article .space-y-3 > * { margin: 0; }
+  .home-summary article .text-2xl { font-size: 1.125rem; }
+  .home-summary .h-16 { height: 3rem; min-width: 3rem; }
+  .home-summary .mt-5 { margin-top: 0.75rem; }
+}

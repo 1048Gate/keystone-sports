@@ -1,0 +1,27 @@
+name = "keystone-sports"
+main = "dist/server/index.mjs"
+account_id = "9f99f068882ff62fff142655f4c9f0cc"
+compatibility_date = "2026-09-07"
+
+[assets]
+directory = "dist/client"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "keystone-sports"
+database_id = "9d1f8f05-10d5-4a1c-87d5-fe038a328540"
+preview_database_id = "9d1f8f05-10d5-4a1c-87d5-fe038a328540"
+migrations_dir = "drizzle"
+
+[vars]
+KEYSTONE_ADMIN_EMAIL = "collindk94@gmail.com"
+KEYSTONE_AI_ENABLED = "true"
+
+# Secrets (set with wrangler secret put, NOT in this file):
+#   AI_API_KEY  (Groq key, console.groq.com)   -> wrangler secret put AI_API_KEY
+#   AI_MODEL    (e.g. openai/gpt-oss-120b)      -> wrangler secret put AI_MODEL
+#   KEYSTONE_AUTO_RECAP_SECRET                  -> wrangler secret put KEYSTONE_AUTO_RECAP_SECRET
+#   KEYSTONE_ADMIN_EMAIL  (set as a var, below) -> wrangler secret put KEYSTONE_ADMIN_EMAIL if moved to a secret
+
+[triggers]
+crons = ["0 1 * * *"]

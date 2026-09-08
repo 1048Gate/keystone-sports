@@ -1,0 +1,1 @@
+export type Post = { id: string; date: string; kind: 'note' | 'event' | 'recap'; title: string; body: string; eventTime: string | null; teamSlug?: string | null; published: number; updatedAt: string };
