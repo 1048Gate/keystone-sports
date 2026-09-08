@@ -514,7 +514,7 @@ function TodayPage() {
               <PenLine className="h-4 w-4" />
               {busy ? "Writing…" : !aiAccess.aiEnabled ? "Recaps not enabled yet" : "Write the recap"}
             </Button>
-            {aiAccess.aiEnabled && !aiAccess.signedIn ? <a href="/signin-with-chatgpt?return_to=%2F" target="_top" className="mt-2 block text-sm underline">Sign in for AI features</a> : null}
+            {aiAccess.aiEnabled && !aiAccess.signedIn ? <p className="mt-2 text-sm text-muted">Owner AI unlocks after Cloudflare Access sign-in.</p> : null}
             {briefError ? <p className="mt-3 text-sm text-danger">{briefError}</p> : null}
             {brief ? (
               <div className="mt-4 space-y-3 border-t border-border pt-4 text-sm leading-relaxed text-fg">

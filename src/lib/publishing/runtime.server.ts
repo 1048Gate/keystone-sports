@@ -14,12 +14,33 @@ export function db(): Database {
   if (!binding) throw new Error('Publishing storage is unavailable. Your draft has not been changed.');
   return binding;
 }
+
+/**
+ * Resolve the signed-in owner for publishing / AI.
+ * Preference order:
+ * 1) Cloudflare Access email header (trusted when Access protects this Worker)
+ * 2) Legacy ChatGPT/OpenAI host headers (only when hosted behind that gateway)
+ */
 export function identity() {
   setResponseHeader('Cache-Control', 'private, no-store');
+  const owner = runtime().KEYSTONE_ADMIN_EMAIL?.trim().toLowerCase();
+
+  const accessEmail = getRequestHeader('cf-access-authenticated-user-email')?.trim().toLowerCase();
+  if (accessEmail) {
+    return {
+      id: `access:${accessEmail}`,
+      admin: Boolean(owner && accessEmail === owner),
+      adminConfigured: Boolean(owner),
+    };
+  }
+
   const id = getRequestHeader('oai-authenticated-user-id');
   const email = getRequestHeader('oai-authenticated-user-email')?.toLowerCase();
-  const owner = runtime().KEYSTONE_ADMIN_EMAIL?.trim().toLowerCase();
-  return { id, admin: Boolean(id && owner && email === owner), adminConfigured: Boolean(owner) };
+  return {
+    id,
+    admin: Boolean(id && owner && email === owner),
+    adminConfigured: Boolean(owner),
+  };
 }
 export function requireAdmin() {
   const user = identity();
@@ -28,7 +49,8 @@ export function requireAdmin() {
 }
 export async function requireAiAccess() {
   const user = identity();
-  if (!user.id) throw new Error('Sign in with ChatGPT to use AI features.');
+  if (!user.id) throw new Error('Sign in as the site owner to use AI features.');
+  if (!user.admin) throw new Error('Only the configured owner can use AI features.');
   if (runtime().KEYSTONE_AI_ENABLED !== 'true' || !runtime().AI_API_KEY) throw new Error('AI features are not enabled. Scores and schedules still work.');
   const day = new Date().toISOString().slice(0, 10);
   const expires = Date.now() + 2 * 86400000;
