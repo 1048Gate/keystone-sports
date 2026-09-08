@@ -1,4 +1,5 @@
-import { getSiteAccess } from '@/lib/publishing/api';
+import { getSiteAccess, getPublishedPosts } from '@/lib/publishing/api';
+import type { Post } from '@/lib/publishing/types';
 import { FeedStatus } from '@/components/feed-status';
 import { PublishedUpdates } from '@/components/published-updates';
 import { FollowOnboarding } from '@/components/follow-onboarding';
@@ -16,9 +17,9 @@ import { getMonthBoard, getNewsFeed, getTodayBoard, generateBrief } from "@/lib/
 import { rememberBoard } from "@/lib/sports/board-cache";
 import { useDesk } from "@/lib/sports/desk-store";
 import { useFollows } from "@/lib/sports/follow-store";
-import { applyView, buildKicker, featuredLabel, pickFeatured, rankPaNews } from "@/lib/sports/filter";
+import { applyView, featuredLabel, humanKicker, pickFeatured, rankPaNews } from "@/lib/sports/filter";
 import { parseRegion, readPrefs, writePrefs } from "@/lib/sports/prefs";
-import { addDays, dateKeyNY, formatLongDate, relativeWhen, weekdayShort } from "@/lib/sports/time";
+import { addDays, dateKeyNY, formatKick, formatLongDate, relativeWhen, weekdayShort } from "@/lib/sports/time";
 import type { NewsItem } from "@/lib/sports/types";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +34,8 @@ export const Route = createFileRoute("/")({
   loaderDeps: ({ search }) => ({ date: search.date }),
   loader: async ({ deps }) => {
     const board = await getTodayBoard({ data: { date: deps.date } });
-    return { board };
+    const posts = await getPublishedPosts({ data: { date: board.date } }).catch(() => [] as Post[]);
+    return { board, posts };
   },
   staleTime: 20_000,
   pendingComponent: PendingScreen,
@@ -184,7 +186,16 @@ function TodayPage() {
   const feature = pickFeatured(games, followed, upcomingAll);
   const rest = games.filter((g) => g.id !== feature?.id);
   const upcoming = upcomingAll.filter((g) => g.id !== feature?.id).slice(0, 8);
-  const kicker = buildKicker(games, upcomingAll, recent);
+  const recap = (loader.posts ?? []).find((p) => p.kind === "recap") ?? null;
+  const nextUp = upcomingAll.find((g) => g.status !== "post") ?? board.upcoming.find((g) => g.status !== "post");
+  const desk = humanKicker({
+    date,
+    recap,
+    slateCount: board.games.length,
+    next: nextUp
+      ? { away: nextUp.away.abbr, home: nextUp.home.abbr, when: formatKick(nextUp.start) }
+      : null,
+  });
   const rankedNews = useMemo(() => rankPaNews(news.articles, followed), [news.articles, followed]);
   const lead = rankedNews.find((a) => a.image) ?? rankedNews[0];
   const moreNews = rankedNews.filter((a) => a.id !== lead?.id).slice(0, 6);
@@ -312,9 +323,8 @@ function TodayPage() {
               </Button>
             </div>
           </div>
-          <p className="mt-2 max-w-2xl text-base leading-snug text-fg sm:text-lg">
-            {kicker || "Philly, Pittsburgh, and the colleges on one slate."}
-          </p>
+          <p className="mt-2 max-w-2xl text-base leading-snug text-fg sm:text-lg">{desk.line}</p>
+          {desk.lede ? <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">{desk.lede}</p> : null}
           <div className="mt-3 flex flex-wrap gap-3 text-sm">
             {followed.length ? <button className="font-semibold text-accent underline" onClick={() => patch({ region: 'following' })}>My Teams ({followed.length})</button> : <Link to="/teams" className="font-semibold text-accent underline">Choose your teams</Link>}
             <Link to="/desk" className="underline">My Notes</Link>

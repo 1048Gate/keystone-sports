@@ -3,6 +3,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { FollowButton } from "@/components/follow-button";
 import { GameCard } from "@/components/game-card";
 import { PendingScreen } from "@/components/pending-screen";
+import { HIGHLIGHT_BY_SLUG } from "@/data/highlights";
 import { TEAM_BY_SLUG, teamLogo } from "@/data/teams";
 import { getTeamPage } from "@/lib/sports/api";
 import { getTeamPosts } from "@/lib/publishing/api";
@@ -53,6 +54,28 @@ function TeamPage() {
             </p>
             <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">{team.name}</h1>
             <p className="mt-1 text-muted">{team.nick}</p>
+            <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              {team.xHandle ? (
+                <a
+                  href={`https://x.com/${team.xHandle}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-fg hover:text-accent"
+                >
+                  @{team.xHandle}
+                </a>
+              ) : null}
+              {HIGHLIGHT_BY_SLUG[team.slug] ? (
+                <a
+                  href={HIGHLIGHT_BY_SLUG[team.slug].href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted hover:text-fg"
+                >
+                  Highlights
+                </a>
+              ) : null}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <FollowButton slug={team.slug} name={team.shortName} />

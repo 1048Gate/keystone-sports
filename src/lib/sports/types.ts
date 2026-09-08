@@ -53,6 +53,16 @@ export type NewsItem = {
   byline?: string;
   teamSlug?: string;
   league?: string;
+  source?: string;
+};
+
+export type HighlightItem = {
+  id: string;
+  title: string;
+  href: string;
+  teamSlug?: string;
+  league?: string;
+  label: string;
 };
 
 export type BuzzItem = {
@@ -85,6 +95,7 @@ export type NewsWire = {
   warnings?: string[];
   articles: NewsItem[];
   buzz: BuzzItem[];
+  highlights: HighlightItem[];
 };
 
 export type TeamRecord = {

@@ -3,8 +3,10 @@ import { sameGame } from './identity';
 import { briefCacheKey, briefFacts, type BriefInput } from './brief';
 import { applyView } from './filter';
 import { ESPN_INDEX, MLB_INDEX, TEAMS, TEAM_BY_SLUG, espnLogo, lookupSlug } from "@/data/teams";
-import type { BuzzItem, Game, GameOdds, GameSide, GameStatus, NewsItem, StandingsBoard, StandingGroup, StandingsLeague, StandingRow, TeamFormRow } from "./types";
+import type { BuzzItem, Game, GameOdds, GameSide, GameStatus, HighlightItem, NewsItem, StandingsBoard, StandingGroup, StandingsLeague, StandingRow, TeamFormRow } from "./types";
 import { addDays, checkedDate, dateKeyNY, espnDateParam, monthBounds } from "./time";
+import { BEAT_FEEDS, dedupeNews, filmFromNews, mentionsPa, parseRssItems, rssToNews } from "./beat";
+import { HIGHLIGHT_HUBS } from "@/data/highlights";
 
 const ESPN = "https://site.web.api.espn.com/apis/site/v2";
 const UA =
@@ -599,27 +601,54 @@ function parseArticle(raw: unknown, teamSlug?: string, league?: string): NewsIte
   };
 }
 
+async function loadBeatArticles(): Promise<NewsItem[]> {
+  const jobs = BEAT_FEEDS.map(async (feed) => {
+    try {
+      const xml = await cached(`beat:${feed.id}`, 10 * 60_000, () => getText(feed.url));
+      let items = parseRssItems(xml);
+      if (!feed.teamSlug) items = items.filter((item) => mentionsPa(`${item.title} ${item.description}`));
+      return items
+        .sort((a, b) => b.published.localeCompare(a.published))
+        .slice(0, feed.teamSlug ? 5 : 6)
+        .map((item) => rssToNews(feed, item));
+    } catch {
+      return [] as NewsItem[];
+    }
+  });
+  const chunks = await timed(Promise.all(jobs), 9000, [] as NewsItem[][]);
+  return chunks.flat();
+}
+
+function hubHighlights(): HighlightItem[] {
+  return HIGHLIGHT_HUBS.map((hub) => ({
+    id: `hub:${hub.slug}`,
+    title: `${hub.label} highlights`,
+    href: hub.href,
+    teamSlug: hub.slug,
+    label: "Official",
+  }));
+}
+
 async function buildNews() {
   const jobs = TEAMS.map(async (team) => {
     const url = `${ESPN}/sports/${team.espnSport}/${team.espnLeague}/news?team=${team.espnId}`;
     try {
       return arr(rec(await cached(`news:${team.slug}`, 5 * 60_000, () => getJson(url)))?.articles)
         .map((a) => parseArticle(a, team.slug, team.league))
-        .filter((a): a is NewsItem => Boolean(a));
+        .filter((a): a is NewsItem => Boolean(a))
+        .map((a) => ({ ...a, source: a.source || "ESPN" }));
     } catch {
       return [] as NewsItem[];
     }
   });
-  const chunks = await timed(Promise.all(jobs), 12000, [] as NewsItem[][]);
-  const seen = new Set<string>();
-  const articles: NewsItem[] = [];
-  for (const item of chunks.flat().sort((a, b) => b.published.localeCompare(a.published))) {
-    const k = item.headline.toLowerCase();
-    if (seen.has(k)) continue;
-    seen.add(k);
-    articles.push(item);
-  }
-  return { generatedAt: new Date().toISOString(), articles: articles.slice(0, 40) };
+  const [chunks, beat] = await Promise.all([
+    timed(Promise.all(jobs), 12000, [] as NewsItem[][]),
+    loadBeatArticles(),
+  ]);
+  const articles = dedupeNews(
+    [...chunks.flat(), ...beat].sort((a, b) => (b.published || "").localeCompare(a.published || "")),
+  );
+  return { generatedAt: new Date().toISOString(), articles: articles.slice(0, 72) };
 }
 
 export async function loadNews() {
@@ -680,7 +709,15 @@ export async function loadNewsWire() {
     async () => {
       const news = await loadNews();
       const buzz = await timed(loadBuzz(), 4000, [] as BuzzItem[]);
-      return { generatedAt: new Date().toISOString(), articles: news.articles, buzz };
+      const film = filmFromNews(news.articles);
+      const filmUrls = new Set(film.map((f) => f.href));
+      const articles = news.articles.filter((a) => !filmUrls.has(a.href));
+      return {
+        generatedAt: new Date().toISOString(),
+        articles,
+        buzz,
+        highlights: [...film, ...hubHighlights()],
+      };
     },
     12 * 60_000,
   );

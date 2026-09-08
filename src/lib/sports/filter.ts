@@ -1,6 +1,7 @@
 import { TEAMS, TEAM_BY_SLUG, type Region } from "@/data/teams";
 import type { ViewRegion } from "./prefs";
-import { addDays, dateKeyNY, formatKick, formatShortDate } from "./time";
+import { addDays, dateKeyNY, formatKick, formatLongDate, formatShortDate } from "./time";
+import { similarHeadlines } from "./beat";
 import type { Game, NewsItem } from "./types";
 
 export function isFollowedGame(game: Game, followed: string[]): boolean {
@@ -49,6 +50,10 @@ const PA_WORDS = TEAMS.flatMap((t) => [
   t.slug.replace("-", " "),
 ]).concat(["philly", "philadelphia", "pittsburgh", "penn state", "nittany", "eagles", "steelers"]);
 
+function headlineKey(headline: string): string {
+  return headline.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
 export function rankPaNews(articles: NewsItem[], followed: string[] = []): NewsItem[] {
   const score = (a: NewsItem) => {
     let n = 0;
@@ -59,11 +64,47 @@ export function rankPaNews(articles: NewsItem[], followed: string[] = []): NewsI
     if (a.image) n += 1;
     return n;
   };
-  return [...articles].sort((a, b) => {
+  const ranked = [...articles].sort((a, b) => {
     const d = score(b) - score(a);
     if (d) return d;
     return (b.published || "").localeCompare(a.published || "");
   });
+  const kept: NewsItem[] = [];
+  const seen = new Set<string>();
+  for (const item of ranked) {
+    const key = headlineKey(item.headline);
+    if (!key || seen.has(key)) continue;
+    if (kept.some((prev) => similarHeadlines(prev.headline, item.headline))) continue;
+    seen.add(key);
+    kept.push(item);
+  }
+  return kept;
+}
+
+export function humanKicker(input: {
+  date: string;
+  recap?: { title: string; body: string; date: string } | null;
+  slateCount: number;
+  next?: { away: string; home: string; when: string } | null;
+}): { line: string; lede?: string } {
+  const recap = input.recap;
+  if (recap?.title?.trim()) {
+    const titled = recap.title.trim();
+    const clean = recap.body.replace(/\s+/g, " ").trim();
+    const sentence = clean.match(/^.{24,200}?[.!?]/)?.[0]?.trim();
+    const lede = sentence && sentence.toLowerCase() !== titled.toLowerCase() ? sentence : undefined;
+    return { line: `${formatShortDate(recap.date || input.date)} · ${titled}`, lede };
+  }
+  const weekday = formatLongDate(input.date).split(",")[0] || "Today";
+  if (input.slateCount > 0) {
+    const n = input.slateCount === 1 ? "one Pennsylvania game" : `${input.slateCount} Pennsylvania games`;
+    return { line: `${weekday} desk. ${n} on the board.` };
+  }
+  if (input.next?.away && input.next.home) {
+    const when = input.next.when ? `, ${input.next.when}` : "";
+    return { line: `${weekday} is a quiet one. Next up: ${input.next.away} at ${input.next.home}${when}.` };
+  }
+  return { line: `${weekday} desk. Nothing on the Pennsylvania slate.` };
 }
 
 function firstPlayable(list: Game[], followed: string[]): Game | undefined {

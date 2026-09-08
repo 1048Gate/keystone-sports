@@ -99,13 +99,12 @@ export function DeskShell({ children }: { children: ReactNode }) {
             <div>
               <p className="font-display text-2xl tracking-widest">KEYSTONE</p>
               <p className="mt-1 max-w-sm text-sm text-muted">
-                Scores, calendars, lines, and news for 15 Pennsylvania teams and programs — Philly, Pittsburgh, and the
-                colleges.
+                A small Pennsylvania desk — Philly, Pittsburgh, and the colleges. Scores, lines, and the beat, written
+                like the sports page, not a dashboard.
               </p>
               <Link to="/desk" className="mt-3 inline-block text-sm font-medium text-fg underline-offset-2 hover:underline">
                 My Notes
               </Link>
-              <Link to="/editor" className="ml-4 text-sm underline">Publisher dashboard</Link>
             </div>
             <div className="grid grid-cols-2 gap-x-10 gap-y-2 sm:grid-cols-3">
               {footerTeams.map((t) => (
@@ -122,7 +121,7 @@ export function DeskShell({ children }: { children: ReactNode }) {
           </div>
           <div className="mt-8 flex flex-col gap-3 border-t border-border pt-6 text-xs text-subtle sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-              <p>Keystone · Pennsylvania sports, every day.</p>
+              <p>Keystone · a small desk for a big state.</p>
               <a
                 href="https://twohoundsrun.com"
                 target="_blank"

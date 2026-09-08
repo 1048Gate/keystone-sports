@@ -48,8 +48,8 @@ function TeamsPage() {
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">Teams</h1>
         <p className="mt-3 max-w-xl text-muted">
-          Fifteen clubs. Star the ones you care about — they jump the ticker, the scores slate, and the Following
-          filter. Open a club for schedule, beat news, X, and the locker room.
+          Fifteen Pennsylvania clubs. Star the ones you follow — they lead the ticker and the slate. Open a club for
+          the schedule, the beat, and the team's own feed.
         </p>
         {followed.length ? (
           <section className="mt-10">
