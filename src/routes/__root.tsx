@@ -20,10 +20,11 @@ export const Route = createRootRoute({
       { name: "theme-color", content: "#102036" },
     ],
     links: [
+      { rel: "icon", type: "image/png", href: "/brand/two-hounds-mark.png" },
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: import.meta.env.VITE_STANDALONE === "true" ? "/manifest.webmanifest" : "/__grok/manifest.webmanifest" },
-      { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
+      { rel: "apple-touch-icon", href: "/brand/two-hounds-mark.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

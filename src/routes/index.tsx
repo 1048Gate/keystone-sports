@@ -1,6 +1,7 @@
 import { getSiteAccess } from '@/lib/publishing/api';
 import { FeedStatus } from '@/components/feed-status';
 import { PublishedUpdates } from '@/components/published-updates';
+import { FollowOnboarding } from '@/components/follow-onboarding';
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Copy, PenLine, RefreshCw } from "lucide-react";
@@ -349,14 +350,15 @@ function TodayPage() {
               <GameCard game={feature} featured />
             </div>
           ) : null}
+          <PublishedUpdates date={date} />
         </div>
       </section>
 
+      <FollowOnboarding />
       <TeamRail />
 
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1.65fr)_minmax(18rem,0.85fr)]">
         <div>
-          <PublishedUpdates date={date} />
           <FilterChips
             region={region}
             sport={sport}
