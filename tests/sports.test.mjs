@@ -62,7 +62,7 @@ test('historical board fetches the requested date rather than filtering the pres
   assert.equal(server.parseEspnEvent({ ...fixture, status: { type: { state: 'pre', shortDetail: 'Postponed' } } }, 'nfl').statusText, 'Postponed');
 });
 test('publisher rejects anonymous, wrong-owner and unconfigured identities', () => {
-  for (const headers of [{}, { 'oai-authenticated-user-id': 'other', 'oai-authenticated-user-email': 'other@example.com' }]) {
+  for (const headers of [{}, { 'oai-authenticated-user-id': 'other', 'oai-authenticated-user-email': 'other@example.com' }, { 'cf-access-authenticated-user-email': 'other@example.com' }]) {
     const auth = moduleFunctions('src/lib/publishing/runtime.server.ts', ['requireAdmin'], { env: { KEYSTONE_ADMIN_EMAIL: 'owner@example.com' }, getRequestHeader: key => headers[key], setResponseHeader() {} });
     assert.throws(() => auth.requireAdmin());
   }
@@ -70,7 +70,10 @@ test('publisher rejects anonymous, wrong-owner and unconfigured identities', () 
   const deps = { env: { KEYSTONE_ADMIN_EMAIL: 'owner@example.com' }, getRequestHeader: key => headers[key], setResponseHeader() {} };
   assert.equal(moduleFunctions('src/lib/publishing/runtime.server.ts', ['requireAdmin'], deps).requireAdmin(), 'owner-id');
   assert.throws(() => moduleFunctions('src/lib/publishing/runtime.server.ts', ['requireAdmin'], { ...deps, env: {} }).requireAdmin());
+  const accessDeps = { env: { KEYSTONE_ADMIN_EMAIL: 'owner@example.com' }, getRequestHeader: key => ({ 'cf-access-authenticated-user-email': 'owner@example.com' })[key], setResponseHeader() {} };
+  assert.equal(moduleFunctions('src/lib/publishing/runtime.server.ts', ['requireAdmin'], accessDeps).requireAdmin(), 'access:owner@example.com');
 });
+
 test('calendar export preserves UTC starts and escapes content instead of injecting events', () => {
   const { calendarFile } = moduleFunctions('src/lib/sports/calendar.ts', ['calendarFile']);
   const text = calendarFile({ ...game, name: 'Game\nBEGIN:VEVENT;extra' });

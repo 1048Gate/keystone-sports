@@ -12,7 +12,7 @@ The default build runs Keystone as a Cloudflare module Worker on Sites. It does 
 
 ## Configuration
 
-Sites supplies the `DB` D1 binding and applies the SQL migrations in `drizzle/`. Published posts and drafts use this database. Owner access is enforced on the server using the authenticated Sites identity and `KEYSTONE_ADMIN_EMAIL`, which is already configured for the verified owner. Do not trust identity headers supplied directly to an unprotected Worker: a different host must supply its own trusted authentication gateway.
+Sites supplies the `DB` D1 binding and applies the SQL migrations in `drizzle/`. Published posts and drafts use this database. Owner access is enforced on the server using Cloudflare Access (`Cf-Access-Authenticated-User-Email`) matched to `KEYSTONE_ADMIN_EMAIL` (already set for the verified owner). Put Access in front of `/editor` (and optionally `/desk`) on the Worker; public score pages stay open. Do not trust identity headers on an unprotected Worker. Legacy ChatGPT host headers are only recognized as a fallback when present.
 
 AI is optional and initially disabled. To enable it, set `XAI_API_KEY` as a server secret and `KEYSTONE_AI_ENABLED=true` in the site runtime environment, then deploy with those settings. `XAI_MODEL` optionally overrides the model. Keep keys out of browser code. xAI usage is billed separately by xAI. The app limits AI requests to five per user per day and fifty overall per day. Failed requests can still consume a quota slot. Recaps use fetched game facts; unavailable feeds cause recap generation to stop instead of guessing. No paid AI call was made during verification.
 

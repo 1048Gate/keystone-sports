@@ -46,8 +46,12 @@ function Editor() {
             : 'Only the configured Keystone owner can publish here.'}
         </p>
         {!access.signedIn ? (
-          <a href="/signin-with-chatgpt?return_to=%2Feditor" target="_top" className="underline">Sign in with ChatGPT</a>
-        ) : null}
+          <p className="text-sm text-muted">
+            Sign in with Cloudflare Access using the owner email (<code>KEYSTONE_ADMIN_EMAIL</code>), then reload this page.
+          </p>
+        ) : (
+          <p className="text-sm text-muted">You are signed in, but not as the configured owner.</p>
+        )}
       </div>
     );
   }
