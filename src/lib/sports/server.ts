@@ -2,7 +2,7 @@ import { SportsCache } from './cache';
 import { sameGame } from './identity';
 import { briefCacheKey, briefFacts, type BriefInput } from './brief';
 import { applyView } from './filter';
-import { ESPN_INDEX, MLB_INDEX, TEAMS, TEAM_BY_SLUG, espnLogo, lookupSlug } from "@/data/teams";
+import { MLB_INDEX, TEAMS, TEAM_BY_SLUG, espnLogo, lookupSlug } from "@/data/teams";
 import type { BuzzItem, Game, GameOdds, GameSide, GameStatus, HighlightItem, NewsItem, StandingsBoard, StandingGroup, StandingsLeague, StandingRow, TeamFormRow } from "./types";
 import { addDays, checkedDate, dateKeyNY, espnDateParam, monthBounds } from "./time";
 import { BEAT_FEEDS, dedupeNews, filmFromNews, mentionsPa, parseRssItems, rssToNews } from "./beat";
@@ -174,13 +174,31 @@ function oddsOf(comp: Record<string, unknown>): GameOdds | undefined {
   return { provider, details: line, spread: line, total, homeMl, awayMl, drawMl };
 }
 
+function competitorAbbr(team: Record<string, unknown>): string {
+  return str(team.abbreviation) || str(team.abbrev);
+}
+
+// A numeric ESPN id can collide (NHL CHI is 4, DET is 5). Only treat that hit as a
+// PA club when the competitor abbreviation also matches the club. Abbreviation keys
+// such as nhl:phi / nhl:pit still match real Flyers and Penguins games.
+function paSlugFor(espnLeague: string, id: string, abbr: string): string | undefined {
+  const abbrKey = abbr && abbr !== "TEAM" ? abbr : "";
+  const byAbbr = abbrKey ? lookupSlug(espnLeague, abbrKey) : undefined;
+  if (!id || !/^\d+$/.test(id)) return byAbbr;
+  const byId = lookupSlug(espnLeague, id);
+  if (!byId) return byAbbr;
+  const club = TEAM_BY_SLUG[byId];
+  if (club && abbrKey && abbrKey.toLowerCase() === club.espnAbbr.toLowerCase()) return byId;
+  return byAbbr;
+}
+
 function sideFrom(competitor: Record<string, unknown>, espnLeague: string): GameSide {
   const team = rec(competitor.team) ?? {};
   const id = str(team.id) || str(competitor.id);
-  const abbr = str(team.abbreviation) || str(team.abbrev) || "TEAM";
+  const abbr = competitorAbbr(team) || "TEAM";
   const name = str(team.displayName) || str(team.name) || abbr;
   const logo = str(team.logo) || str(rec(arr(team.logos)[0])?.href) || espnLogo(espnLeague, abbr, id);
-  const slug = lookupSlug(espnLeague, id) ?? lookupSlug(espnLeague, abbr);
+  const slug = paSlugFor(espnLeague, id, abbr);
   const winner = competitor.winner === true;
   return { id, name, abbr, logo, score: scoreOf(competitor), winner, slug };
 }
@@ -279,10 +297,11 @@ function isPaEvent(game: Game, espnLeague: string, raw: unknown): boolean {
   const e = rec(raw);
   const comp = rec(arr(e?.competitions)[0]);
   for (const c of arr(comp?.competitors)) {
-    const team = rec(rec(c)?.team);
-    const id = str(team?.id);
-    const abbr = str(team?.abbreviation);
-    if (ESPN_INDEX[`${espnLeague}:${id}`] || ESPN_INDEX[`${espnLeague}:${abbr.toLowerCase()}`]) return true;
+    const competitor = rec(c);
+    const team = rec(competitor?.team) ?? {};
+    const id = str(team.id) || str(competitor?.id);
+    const abbr = competitorAbbr(team);
+    if (paSlugFor(espnLeague, id, abbr)) return true;
   }
   return false;
 }

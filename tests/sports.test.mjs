@@ -81,3 +81,51 @@ test('calendar export preserves UTC starts and escapes content instead of inject
   assert.equal(text.split('\r\nBEGIN:VEVENT').length, 2);
   assert(text.includes('Game\\nBEGIN:VEVENT\\;extra'));
 });
+
+test('CHI/DET ESPN ids do not stamp Flyers or Penguins as PA', () => {
+  const server = moduleFunctions('src/lib/sports/server.ts', ['parseEspnEvent', 'isPaEvent'], { SportsCache, ...identity, ...time, ...teams, ...briefs, fetch: async () => ({ ok: true, json: async () => ({}) }) });
+  const event = (home, away) => ({
+    id: 'nhl-leak',
+    date: '2026-09-26T23:00:00Z',
+    name: away.name + ' at ' + home.name,
+    competitions: [{ competitors: [
+      { homeAway: 'home', team: home },
+      { homeAway: 'away', team: away },
+    ] }],
+    status: { type: { state: 'pre', shortDetail: 'Sat, September 26th' } },
+  });
+  const chi = event(
+    { id: '4', abbreviation: 'CHI', displayName: 'Chicago Blackhawks' },
+    { id: '19', abbreviation: 'STL', displayName: 'St. Louis Blues' },
+  );
+  const det = event(
+    { id: '5', abbreviation: 'DET', displayName: 'Detroit Red Wings' },
+    { id: '29', abbreviation: 'CBJ', displayName: 'Columbus Blue Jackets' },
+  );
+  const phi = event(
+    { id: '15', abbreviation: 'PHI', displayName: 'Philadelphia Flyers' },
+    { id: '1', abbreviation: 'BOS', displayName: 'Boston Bruins' },
+  );
+  const pit = event(
+    { id: '16', abbreviation: 'PIT', displayName: 'Pittsburgh Penguins' },
+    { id: '8', abbreviation: 'WSH', displayName: 'Washington Capitals' },
+  );
+  const chiGame = server.parseEspnEvent(chi, 'nhl');
+  const detGame = server.parseEspnEvent(det, 'nhl');
+  const phiGame = server.parseEspnEvent(phi, 'nhl');
+  const pitGame = server.parseEspnEvent(pit, 'nhl');
+  assert.deepEqual(chiGame.paSlugs, []);
+  assert.deepEqual(detGame.paSlugs, []);
+  assert.equal(server.isPaEvent(chiGame, 'nhl', chi), false);
+  assert.equal(server.isPaEvent(detGame, 'nhl', det), false);
+  assert.deepEqual(phiGame.paSlugs, ['flyers']);
+  assert.deepEqual(pitGame.paSlugs, ['penguins']);
+  assert.equal(server.isPaEvent(phiGame, 'nhl', phi), true);
+  assert.equal(server.isPaEvent(pitGame, 'nhl', pit), true);
+  const abbrOnly = event(
+    { id: '999', abbreviation: 'PHI', displayName: 'Philadelphia Flyers' },
+    { id: '1', abbreviation: 'BOS', displayName: 'Boston Bruins' },
+  );
+  assert.deepEqual(server.parseEspnEvent(abbrOnly, 'nhl').paSlugs, ['flyers']);
+});
+
