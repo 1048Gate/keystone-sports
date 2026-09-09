@@ -1,6 +1,14 @@
 import { createMiddleware } from '@tanstack/react-start';
 import { runtime } from '@/lib/publishing/runtime.server';
 import { autoRecapDraft } from '@/lib/sports/server';
+import {
+  RECAP_SECRET_DENIED_ERROR,
+  RECAP_SECRET_MISSING_ERROR,
+  RECAP_SECRET_URL_ERROR,
+  queryHasSecret,
+  secretFromHeaders,
+  secretsEqual,
+} from '@/lib/sports/recap-secret';
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -11,7 +19,7 @@ const json = (body: unknown, status = 200) =>
 function checkSecret(provided: string): string | null {
   const env = runtime() as unknown as Record<string, unknown>;
   const expected = typeof env.KEYSTONE_AUTO_RECAP_SECRET === 'string' ? env.KEYSTONE_AUTO_RECAP_SECRET : '';
-  if (!expected || provided !== expected) return 'Auto-recap is not enabled, or the secret is wrong.';
+  if (!expected || !secretsEqual(provided, expected)) return RECAP_SECRET_DENIED_ERROR;
   return null;
 }
 
@@ -21,8 +29,9 @@ export const apiMiddleware = createMiddleware({ type: 'request' }).server(async 
   const { pathname, searchParams } = url;
 
   if (pathname === '/api/auto-recap') {
-    const secret = searchParams.get('secret') ?? '';
-    if (!secret) return json({ ok: false, error: 'Missing secret.' }, 400);
+    if (queryHasSecret(searchParams)) return json({ ok: false, error: RECAP_SECRET_URL_ERROR }, 400);
+    const secret = secretFromHeaders(request.headers);
+    if (!secret) return json({ ok: false, error: RECAP_SECRET_MISSING_ERROR }, 400);
     const denied = checkSecret(secret);
     if (denied) return json({ ok: false, error: denied }, 422);
     try {

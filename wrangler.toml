@@ -2,6 +2,11 @@ name = "keystone-sports"
 main = "dist/server/index.mjs"
 account_id = "9f99f068882ff62fff142655f4c9f0cc"
 compatibility_date = "2026-09-07"
+workers_dev = true
+
+[[routes]]
+pattern = "keystone.twohoundsrun.com"
+custom_domain = true
 
 [assets]
 directory = "dist/client"
@@ -21,6 +26,8 @@ KEYSTONE_AI_ENABLED = "true"
 #   AI_API_KEY  (Groq key, console.groq.com)   -> wrangler secret put AI_API_KEY
 #   AI_MODEL    (e.g. openai/gpt-oss-120b)      -> wrangler secret put AI_MODEL
 #   KEYSTONE_AUTO_RECAP_SECRET                  -> wrangler secret put KEYSTONE_AUTO_RECAP_SECRET
+#   Manual trigger (header only, never ?secret=):
+#     curl -H "Authorization: Bearer $SECRET" https://keystone.twohoundsrun.com/api/auto-recap
 #   KEYSTONE_ADMIN_EMAIL  (set as a var, below) -> wrangler secret put KEYSTONE_ADMIN_EMAIL if moved to a secret
 
 [triggers]

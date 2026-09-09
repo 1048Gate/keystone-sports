@@ -48,6 +48,77 @@ async function getJson(url: string, timeoutMs = 10000): Promise<unknown> {
   }
 }
 
+function workersCache(): Cache | null {
+  try {
+    const store = (globalThis as { caches?: { default?: Cache } }).caches;
+    return store?.default ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Today/live windows stay short. Past-only dates can sit longer. */
+function scoreboardTtlSeconds(dates?: string): number {
+  const live = 60;
+  const past = 20 * 60;
+  if (!dates) return live;
+  const today = dateKeyNY().replaceAll("-", "");
+  const [start, end = start] = dates.split("-");
+  if (!/^\d{8}$/.test(start) || !/^\d{8}$/.test(end)) return live;
+  if (end >= today) return live;
+  return past;
+}
+
+async function getScoreboardJson(url: string, dates?: string, timeoutMs = 10000): Promise<unknown> {
+  const ttl = scoreboardTtlSeconds(dates);
+  const cacheKey = new Request(url, { method: "GET" });
+  const cache = workersCache();
+  if (cache) {
+    try {
+      const hit = await cache.match(cacheKey);
+      if (hit?.ok) return await hit.json();
+    } catch {
+      // Cache API is optional outside Workers.
+    }
+  }
+
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { "User-Agent": UA, Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error(`${res.status} ${url}`);
+    const text = await res.text();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new Error(`invalid JSON ${url}`);
+    }
+    if (cache && res.status === 200) {
+      try {
+        await cache.put(
+          cacheKey,
+          new Response(text, {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": `public, max-age=${ttl}`,
+            },
+          }),
+        );
+      } catch {
+        // Cache write is best-effort. Never cache the error path above.
+      }
+    }
+    return parsed;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function getText(url: string, timeoutMs = 8000): Promise<string> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -310,7 +381,7 @@ async function espnScoreboard(espnSport: string, espnLeague: string, dates?: str
   const q = `?limit=1000${dates ? `&dates=${dates}` : ''}${espnLeague.includes('college') ? '&groups=50' : ''}`;
   const url = `${ESPN}/sports/${espnSport}/${espnLeague}/scoreboard${q}`;
   const key = `sb:${espnLeague}:${dates ?? "now"}`;
-  const json = await cached(key, 25_000, () => getJson(url), 90_000);
+  const json = await cached(key, 25_000, () => getScoreboardJson(url, dates), 90_000);
   const events = arr(rec(json)?.events);
   const games: Game[] = [];
   for (const ev of events) {

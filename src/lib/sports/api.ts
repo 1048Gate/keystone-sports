@@ -73,12 +73,26 @@ export const getStandings = createServerFn({ method: "GET" })
   });
 
 export const runAutoRecap = createServerFn({ method: "POST" })
-  .validator(input => z.object({ secret: z.string().min(8).max(200), date: z.string().refine(validDate).optional() }).parse(input))
+  .validator(input => z.object({ date: z.string().refine(validDate).optional() }).parse(input ?? {}))
   .handler(async ({ data }) => {
+    const { getRequest } = await import("@tanstack/react-start/server");
     const { runtime } = await import("../publishing/runtime.server");
+    const {
+      RECAP_SECRET_DENIED_ERROR,
+      RECAP_SECRET_MISSING_ERROR,
+      RECAP_SECRET_URL_ERROR,
+      queryHasSecret,
+      secretFromHeaders,
+      secretsEqual,
+    } = await import("./recap-secret");
+    const request = getRequest();
+    const url = new URL(request.url);
+    if (queryHasSecret(url.searchParams)) throw new Error(RECAP_SECRET_URL_ERROR);
+    const provided = secretFromHeaders(request.headers);
+    if (!provided) throw new Error(RECAP_SECRET_MISSING_ERROR);
     const env = runtime() as unknown as Record<string, unknown>;
     const expected = typeof env.KEYSTONE_AUTO_RECAP_SECRET === "string" ? env.KEYSTONE_AUTO_RECAP_SECRET : "";
-    if (!expected || data.secret !== expected) throw new Error("Auto-recap is not enabled, or the secret is wrong.");
+    if (!expected || !secretsEqual(provided, expected)) throw new Error(RECAP_SECRET_DENIED_ERROR);
     const { autoRecapDraft } = await import("./server");
     return autoRecapDraft(data.date);
   });
