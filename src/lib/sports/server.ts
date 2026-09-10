@@ -15,15 +15,16 @@ const UA =
 const sportsCache = new SportsCache();
 const mem = sportsCache.entries;
 
-function timed<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+function timed<T>(p: Promise<T>, ms: number, fallback: T | (() => T)): Promise<T> {
+  const use = () => (typeof fallback === "function" ? (fallback as () => T)() : fallback);
   return new Promise((resolve) => {
-    const t = setTimeout(() => resolve(fallback), ms);
+    const t = setTimeout(() => resolve(use()), ms);
     p.then((v) => {
       clearTimeout(t);
       resolve(v);
     }).catch(() => {
       clearTimeout(t);
-      resolve(fallback);
+      resolve(use());
     });
   });
 }
@@ -31,7 +32,7 @@ function timed<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
 async function cached<T>(key: string, ttl: number, fn: () => Promise<T>, stale = ttl * 4): Promise<T> {
   return sportsCache.get(key, ttl, fn, stale);
 }
-function peekCached<T>(key: string): T | undefined { return sportsCache.peek<T>(key); }
+function peekCached<T>(key: string, maxAge?: number): T | undefined { return sportsCache.peek<T>(key, maxAge); }
 
 async function getJson(url: string, timeoutMs = 10000): Promise<unknown> {
   const ctrl = new AbortController();
@@ -541,24 +542,46 @@ function mergeGames(primary: Game[], fallback: Game[]): Game[] {
   return list;
 }
 
+function scheduleTeamId(team: { espnLeague: string; espnAbbr: string; espnId: string }): string {
+  if (team.espnLeague === "mlb") return team.espnAbbr;
+  if (team.espnLeague === "nfl" || team.espnLeague === "nba" || team.espnLeague === "nhl") return team.espnAbbr;
+  return team.espnId;
+}
+
+async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<Game[]>): Promise<Game[]> {
+  const out: Game[][] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  }
+  const n = Math.min(limit, Math.max(items.length, 1));
+  await Promise.all(Array.from({ length: n }, () => worker()));
+  return out.flat();
+}
+
 async function espnSchedulesForPa(): Promise<Game[]> {
-  const jobs: Promise<Game[]>[] = [];
+  type Job = { sport: string; league: string; id: string; seasonType?: number };
+  const jobs: Job[] = [];
   for (const team of TEAMS) {
     if (team.espnLeague === "mlb") continue;
-    const id =
-      team.espnLeague === "nfl" || team.espnLeague === "nba" || team.espnLeague === "nhl"
-        ? team.espnAbbr
-        : team.espnId;
-    const seasonType = team.espnLeague === "nfl" ? 2 : undefined;
-    jobs.push(espnTeamSchedule(team.espnSport, team.espnLeague, id, seasonType).catch(() => []));
+    jobs.push({
+      sport: team.espnSport,
+      league: team.espnLeague,
+      id: scheduleTeamId(team),
+      seasonType: team.espnLeague === "nfl" ? 2 : undefined,
+    });
     if (team.extraLeagues) {
       for (const extra of team.extraLeagues) {
-        jobs.push(espnTeamSchedule(extra.espnSport, extra.espnLeague, extra.espnId).catch(() => []));
+        jobs.push({ sport: extra.espnSport, league: extra.espnLeague, id: extra.espnId });
       }
     }
   }
-  const chunks = await Promise.all(jobs);
-  return chunks.flat();
+  return mapLimit(jobs, 4, (job) =>
+    espnTeamSchedule(job.sport, job.league, job.id, job.seasonType).catch(() => [] as Game[]),
+  );
 }
 
 async function liveScoreboards(day: string): Promise<Game[]> {
@@ -580,15 +603,13 @@ async function liveScoreboards(day: string): Promise<Game[]> {
 }
 
 async function weekOddsBoards(day: string): Promise<Game[]> {
-  const footballRange = `${espnDateParam(day)}-${espnDateParam(addDays(day, 10))}`;
-  const mlbRange = `${espnDateParam(day)}-${espnDateParam(addDays(day, 6))}`;
+  // One ranged board per league — undated + single-day copies were duplicate cold-cache work.
+  // Start at day+1 so today's NFL/CFB/MLB overlap with liveScoreboards instead of racing it.
+  const footballRange = `${espnDateParam(addDays(day, 1))}-${espnDateParam(addDays(day, 10))}`;
+  const mlbRange = `${espnDateParam(addDays(day, 1))}-${espnDateParam(addDays(day, 6))}`;
   const chunks = await Promise.all([
-    espnScoreboard("football", "nfl").catch(() => []),
     espnScoreboard("football", "nfl", footballRange).catch(() => []),
-    espnScoreboard("football", "college-football").catch(() => []),
     espnScoreboard("football", "college-football", footballRange).catch(() => []),
-    espnScoreboard("baseball", "mlb", espnDateParam(day)).catch(() => []),
-    espnScoreboard("baseball", "mlb", espnDateParam(addDays(day, 1))).catch(() => []),
     espnScoreboard("baseball", "mlb", mlbRange).catch(() => []),
   ]);
   return chunks.flat();
@@ -628,15 +649,29 @@ function sliceToday(day: string, games: Game[]) {
   };
 }
 
-const LEAGUES = [
+const ALL_LEAGUES = [
   ['football', 'nfl'], ['baseball', 'mlb'], ['hockey', 'nhl'], ['soccer', 'usa.1'],
   ['football', 'college-football'], ['basketball', 'nba'], ['basketball', 'mens-college-basketball'],
 ] as const;
+
+/** Skip off-season boards — each league is a large ESPN payload and Worker CPU/subrequest cost. */
+function activeScoreboardLeagues(day: string) {
+  const month = Number(day.slice(5, 7));
+  const nbaOn = month <= 6 || month >= 10;
+  const ncaabOn = month <= 4 || month >= 11;
+  return ALL_LEAGUES.filter(([, league]) => {
+    if (league === 'nba') return nbaOn;
+    if (league === 'mens-college-basketball') return ncaabOn;
+    return true;
+  });
+}
+
 async function scoreboardRange(start: string, end = start) {
   const dates = start === end ? espnDateParam(start) : `${espnDateParam(start)}-${espnDateParam(end)}`;
-  const results = await Promise.allSettled(LEAGUES.map(([sport, league]) => espnScoreboard(sport, league, dates)));
+  const leagues = activeScoreboardLeagues(start);
+  const results = await Promise.allSettled(leagues.map(([sport, league]) => espnScoreboard(sport, league, dates)));
   return { games: results.flatMap(r => r.status === 'fulfilled' ? r.value : []),
-    warnings: results.flatMap((r, i) => r.status === 'rejected' ? [`${LEAGUES[i][1].toUpperCase()} feed unavailable`] : []) };
+    warnings: results.flatMap((r, i) => r.status === 'rejected' ? [`${leagues[i][1].toUpperCase()} feed unavailable`] : []) };
 }
 async function safeMlb(start: string, end: string) {
   try { return { games: await mlbSchedule(start, end), warnings: [] as string[] }; }
@@ -651,24 +686,26 @@ function freshness(games: Game[], warnings: string[]) {
 export async function loadToday(date?: string) {
   const day = checkedDate(date);
   return cached(`day:${day}`, 20_000, async () => {
-    const [scores, nearby, mlb] = await Promise.all([
-      scoreboardRange(day), scoreboardRange(addDays(day, -2), addDays(day, 10)),
+    // Single window covers today + nearby strip. The old day + day-2..day+10 pair
+    // doubled every league scoreboard (~14 ESPN payloads) on each cold homepage load.
+    const [scores, mlb] = await Promise.all([
+      scoreboardRange(addDays(day, -2), addDays(day, 10)),
       safeMlb(addDays(day, -2), addDays(day, 10)),
     ]);
-    const games = mergeGames(mlb.games, mergeGames(scores.games, nearby.games));
+    const games = mergeGames(mlb.games, scores.games);
     const board = sliceToday(day, games);
-    return { ...board, ...freshness(board.games, [...scores.warnings, ...nearby.warnings, ...mlb.warnings]) };
-  }, 90_000);
+    return { ...board, ...freshness(board.games, [...scores.warnings, ...mlb.warnings]) };
+  }, 5 * 60_000);
 }
 export async function loadMonth(month?: string) {
   const m = month ?? dateKeyNY().slice(0, 7);
   checkedDate(`${m}-01`);
-  return cached(`month:${m}`, 60_000, async () => {
+  return cached(`month:${m}`, 90_000, async () => {
     const { start, end } = monthBounds(m);
     const [mlb, range] = await Promise.all([safeMlb(start, end), scoreboardRange(start, end)]);
     const games = mergeGames(mlb.games, range.games).filter(g => g.dateKey >= start && g.dateKey <= end).sort(byStart);
     return { month: m, games, ...freshness(games, [...mlb.warnings, ...range.warnings]) };
-  }, 90_000);
+  }, 10 * 60_000);
 }
 
 function parseArticle(raw: unknown, teamSlug?: string, league?: string): NewsItem | null {
@@ -816,32 +853,56 @@ export async function loadNewsWire() {
 async function buildTeamPage(slug: string) {
   const team = TEAM_BY_SLUG[slug];
   if (!team) return null;
-  const id = team.espnLeague === "mlb" ? team.espnAbbr : team.espnLeague === "usa.1" ? team.espnId : team.espnAbbr;
+  const id = scheduleTeamId(team);
+  const emptyGames: Game[] = [];
+  const warnings: string[] = [];
+  const mark = (label: string) => (): Game[] => {
+    warnings.push(label);
+    return emptyGames;
+  };
+
   const [schedule, extra, mlb, newsJson, buzz, record] = await Promise.all([
     team.espnLeague === "mlb"
-      ? mlbSchedule(addDays(dateKeyNY(), -7), addDays(dateKeyNY(), 30))
-      : espnTeamSchedule(
-          team.espnSport,
-          team.espnLeague,
-          team.espnLeague === "usa.1" ? team.espnId : id,
-          team.espnLeague === "nfl" ? 2 : undefined,
-        ).catch(() => []),
-    Promise.all(
-      (team.extraLeagues ?? []).map((ex) =>
-        espnTeamSchedule(ex.espnSport, ex.espnLeague, ex.espnId).catch(() => []),
-      ),
-    ).then((x) => x.flat()),
-    team.mlbId ? mlbSchedule(addDays(dateKeyNY(), -7), addDays(dateKeyNY(), 30)) : Promise.resolve([] as Game[]),
-    cached(`news:${team.slug}`, 5 * 60_000, () =>
-      getJson(`${ESPN}/sports/${team.espnSport}/${team.espnLeague}/news?team=${team.espnId}`),
-    ).catch(() => ({})),
-    loadSubreddit(team.reddit, team.slug).catch(() => []),
-    espnTeamRecord(team.espnSport, team.espnLeague, team.espnLeague === "usa.1" ? team.espnId : id).catch(
-      () => undefined,
+      ? timed(mlbSchedule(addDays(dateKeyNY(), -7), addDays(dateKeyNY(), 30)), 8000, mark("MLB schedule delayed"))
+      : timed(
+          espnTeamSchedule(
+            team.espnSport,
+            team.espnLeague,
+            id,
+            team.espnLeague === "nfl" ? 2 : undefined,
+          ).catch(mark("Team schedule unavailable")),
+          8000,
+          mark("Team schedule timed out"),
+        ),
+    timed(
+      Promise.all(
+        (team.extraLeagues ?? []).map((ex) =>
+          espnTeamSchedule(ex.espnSport, ex.espnLeague, ex.espnId).catch(() => [] as Game[]),
+        ),
+      ).then((x) => x.flat()),
+      8000,
+      emptyGames,
+    ),
+    team.mlbId
+      ? timed(mlbSchedule(addDays(dateKeyNY(), -7), addDays(dateKeyNY(), 30)), 8000, emptyGames)
+      : Promise.resolve(emptyGames),
+    timed(
+      cached(`news:${team.slug}`, 5 * 60_000, () =>
+        getJson(`${ESPN}/sports/${team.espnSport}/${team.espnLeague}/news?team=${team.espnId}`, 8000),
+      ).catch(() => ({})),
+      8000,
+      {},
+    ),
+    timed(loadSubreddit(team.reddit, team.slug).catch(() => [] as BuzzItem[]), 5000, [] as BuzzItem[]),
+    timed(
+      espnTeamRecord(team.espnSport, team.espnLeague, id).catch(() => undefined),
+      6000,
+      undefined,
     ),
   ]);
-  void loadPool().catch(() => undefined);
-  const cachedPool = (peekCached<Game[]>("pool") ?? []).filter((g) => g.paSlugs.includes(slug));
+  // Do not kick off buildPool here — that fan-out (live + week + every PA schedule)
+  // was exhausting Worker CPU/subrequests on college hub loads (Error 1102).
+  const cachedPool = (peekCached<Game[]>("pool", 15 * 60_000) ?? []).filter((g) => g.paSlugs.includes(slug));
   const pool = mergeGames(mergeGames([...schedule, ...extra], mlb), cachedPool).filter((g) =>
     g.paSlugs.includes(slug),
   );
@@ -859,6 +920,7 @@ async function buildTeamPage(slug: string) {
     const result: "W" | "L" | "T" = us > them ? "W" : us < them ? "L" : "T";
     return { result, opponent: theirs.name, score: `${ours.score}-${theirs.score}`, dateKey: g.dateKey };
   });
+  if (!pool.length) warnings.push("Schedule feed incomplete — club links still work.");
   return {
     slug,
     generatedAt: new Date().toISOString(),
@@ -867,13 +929,26 @@ async function buildTeamPage(slug: string) {
     buzz,
     record,
     form,
+    warnings: [...new Set(warnings)],
   };
 }
 
 export async function loadTeamPage(slug: string) {
   const team = TEAM_BY_SLUG[slug];
   if (!team) return null;
-  return cached(`team:${slug}`, 45_000, () => buildTeamPage(slug), 3 * 60_000);
+  try {
+    return await cached(`team:${slug}`, 45_000, () => buildTeamPage(slug), 3 * 60_000);
+  } catch {
+    // Never leave the hub hanging: identity + empty slots beat a permanent skeleton.
+    return {
+      slug,
+      generatedAt: new Date().toISOString(),
+      games: [] as Game[],
+      articles: [] as NewsItem[],
+      buzz: [] as BuzzItem[],
+      warnings: ["Team feeds are temporarily unavailable."],
+    };
+  }
 }
 
 export async function writeBrief(input: BriefInput): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
