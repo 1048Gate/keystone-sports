@@ -139,5 +139,7 @@ export type StandingsBoard = {
   league: StandingsLeague;
   generatedAt: string;
   groups: StandingGroup[];
+  seasonLabel?: string;
+  seasonNote?: string;
   warnings?: string[];
 };

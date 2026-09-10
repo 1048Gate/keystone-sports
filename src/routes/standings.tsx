@@ -23,27 +23,6 @@ const COLS: Record<StandingsLeague, string[]> = {
   cbb: ["W", "L", "PCT"],
 };
 
-function earlySeasonNote(league: StandingsLeague, groups: { rows: StandingRow[] }[]): string | null {
-  const rows = groups.flatMap((g) => g.rows);
-  if (!rows.length) return null;
-  const reset = rows.every((r) => r.wins === 0 && r.losses === 0 && !(r.ties ?? 0) && !(r.points ?? 0));
-  if (!reset) return null;
-  switch (league) {
-    case "nfl":
-      return "NFL week 1 — records reset";
-    case "cfb":
-      return "College football is just getting started — records reset";
-    case "nba":
-      return "NBA hasn't tipped yet — records reset";
-    case "nhl":
-      return "NHL hasn't dropped the puck — records reset";
-    case "cbb":
-      return "College hoops is between seasons — records reset";
-    default:
-      return "These clubs are still 0-0";
-  }
-}
-
 function cellValue(name: string, r: StandingRow): string {
   switch (name) {
     case "W": return String(r.wins);
@@ -68,7 +47,6 @@ export const Route = createFileRoute("/standings")({
 function StandingsPage() {
   const board = Route.useLoaderData();
   const cols = COLS[board.league] ?? COLS.nfl;
-  const resetNote = earlySeasonNote(board.league, board.groups);
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">Standings</h1>
@@ -91,7 +69,8 @@ function StandingsPage() {
         ))}
       </div>
       <FeedStatus at={board.generatedAt} warnings={board.warnings ?? []} />
-      {resetNote ? <p className="mt-4 text-sm font-semibold text-accent">{resetNote}</p> : null}
+      {board.seasonLabel ? <p className="mt-4 text-sm text-muted">Season: {board.seasonLabel}</p> : null}
+      {board.seasonNote ? <p className="mt-2 text-sm font-semibold text-accent">{board.seasonNote}</p> : null}
       {board.groups.length ? (
         <div className="mt-6 space-y-8">
           {board.groups.map((g) => (

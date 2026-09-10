@@ -958,25 +958,101 @@ const STANDINGS_LEAGUES: Record<StandingsLeague, { sport: string; league: string
   cbb: { sport: "basketball", league: "mens-college-basketball", label: "College Basketball" },
 };
 
+/** ESPN conference group ids whose children are division tables (desk-standard). */
+const DIVISION_CONF_GROUPS: Partial<Record<StandingsLeague, number[]>> = {
+  mlb: [7, 8],
+  nfl: [8, 7],
+  nba: [5, 6],
+  nhl: [7, 8],
+};
+
 function numStat(stats: Record<string, unknown>, name: string): number {
   const raw = String(stats[name] ?? "").replace(/[^\d.-]/g, "");
   const n = Number(raw);
   return Number.isFinite(n) ? n : 0;
 }
 
-function winPct(stats: Record<string, unknown>, leagueKey: StandingsLeague, wins: number, losses: number): string {
+/** Prefer primary ESPN stats; college feeds repeat wins/GB/streak under home/away/vs* (type contains "_"). */
+function entryStats(entry: Record<string, unknown>): Record<string, unknown> {
+  const stats: Record<string, unknown> = {};
+  for (const s of arr(entry.stats)) {
+    const so = rec(s);
+    if (!so) continue;
+    const type = str(so.type);
+    if (type.includes("_")) continue;
+    const name = str(so.name);
+    if (!name || name in stats) continue;
+    stats[name] = so.displayValue ?? so.value;
+  }
+  return stats;
+}
+
+function recordFromOverall(stats: Record<string, unknown>): { wins: number; losses: number; ties?: number } | null {
+  const m = str(stats.overall).match(/^(\d+)\s*-\s*(\d+)(?:\s*-\s*(\d+))?$/);
+  if (!m) return null;
+  return {
+    wins: Number(m[1]),
+    losses: Number(m[2]),
+    ties: m[3] != null ? Number(m[3]) : undefined,
+  };
+}
+
+function winPct(stats: Record<string, unknown>, leagueKey: StandingsLeague, wins: number, losses: number, ties = 0): string {
   if (leagueKey === "nhl") {
     const gp = numStat(stats, "gamesPlayed");
     const points = numStat(stats, "points");
     return gp > 0 ? (points / (gp * 2)).toFixed(3) : ".000";
   }
   const provided = String(stats.winPercent ?? "");
-  if (/^\.?\d{3}$/.test(provided)) return provided;
-  const games = wins + losses;
-  return games > 0 ? (wins / games).toFixed(3) : ".000";
+  if (/^\.\d{3}$/.test(provided)) return provided;
+  if (/^0\.\d{3}$/.test(provided)) return provided.slice(1);
+  const games = wins + losses + ties;
+  if (games <= 0) return ".000";
+  const pct = (wins + ties * 0.5) / games;
+  const fixed = pct.toFixed(3);
+  return fixed.startsWith("0") ? fixed.slice(1) : fixed;
 }
 
-function standingGroupFrom(child: Record<string, unknown>, leagueKey: StandingsLeague): StandingGroup | null {
+function sortStandingRows(rows: StandingRow[], leagueKey: StandingsLeague): StandingRow[] {
+  const pct = (r: StandingRow) => {
+    const raw = r.winPercent.startsWith(".") ? `0${r.winPercent}` : r.winPercent;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : 0;
+  };
+  return [...rows].sort((a, b) => {
+    if (leagueKey === "nhl") {
+      const byPts = (b.points ?? 0) - (a.points ?? 0);
+      if (byPts) return byPts;
+      const byWins = b.wins - a.wins;
+      if (byWins) return byWins;
+    } else {
+      const byPct = pct(b) - pct(a);
+      if (byPct) return byPct;
+      const byWins = b.wins - a.wins;
+      if (byWins) return byWins;
+      const byLosses = a.losses - b.losses;
+      if (byLosses) return byLosses;
+    }
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function groupDisplayName(nodeName: string, parentName?: string): string {
+  if (!parentName) return nodeName || "Standings";
+  if (!nodeName) return parentName;
+  if (nodeName.includes(parentName) || parentName.includes(nodeName)) return nodeName;
+  // NBA children are short ("Atlantic"); AFC/NFC/division titles already stand alone.
+  if (
+    /conference/i.test(parentName) &&
+    !/conference|league|division|\bafc\b|\bnfc\b/i.test(nodeName)
+  ) {
+    const short = parentName.replace(/\s+Conference$/i, "");
+    return `${short} · ${nodeName}`;
+  }
+  return nodeName;
+}
+
+function standingGroupFrom(child: Record<string, unknown>, leagueKey: StandingsLeague, parentName?: string): StandingGroup | null {
   const espnLeague = STANDINGS_LEAGUES[leagueKey].league;
   const rows: StandingRow[] = [];
   const standingsEntries = rec(child.standings)?.entries;
@@ -986,15 +1062,19 @@ function standingGroupFrom(child: Record<string, unknown>, leagueKey: StandingsL
     if (!entry || !team) continue;
     const id = str(team.id);
     const abbr = str(team.abbreviation) || str(team.abbrev) || "—";
-    const stats: Record<string, unknown> = {};
-    for (const s of arr(entry.stats)) {
-      const so = rec(s);
-      if (so) stats[str(so.name)] = so.displayValue ?? so.value;
+    const stats = entryStats(entry);
+    const overall = recordFromOverall(stats);
+    let wins = numStat(stats, "wins");
+    let losses = numStat(stats, "losses");
+    let ties = numStat(stats, "ties");
+    // CFB often exposes overall "1-0" without a top-level losses field.
+    if (overall && (!("losses" in stats) || (wins === 0 && losses === 0 && overall.wins + overall.losses > 0))) {
+      wins = overall.wins;
+      losses = overall.losses;
+      if (overall.ties != null) ties = overall.ties;
     }
-    const wins = numStat(stats, "wins");
-    const losses = numStat(stats, "losses");
-    const ties = numStat(stats, "ties");
     const otl = numStat(stats, "overtimeLosses") || numStat(stats, "otLosses");
+    const blank = wins === 0 && losses === 0 && ties === 0 && !(leagueKey === "nhl" && numStat(stats, "points") > 0);
     rows.push({
       teamId: id,
       slug: lookupSlug(espnLeague, id) ?? lookupSlug(espnLeague, abbr),
@@ -1005,39 +1085,137 @@ function standingGroupFrom(child: Record<string, unknown>, leagueKey: StandingsL
       ties: ties > 0 ? ties : undefined,
       otl: leagueKey === "nhl" && otl > 0 ? otl : undefined,
       points: leagueKey === "nhl" ? numStat(stats, "points") : undefined,
-      winPercent: winPct(stats, leagueKey, wins, losses),
-      gamesBehind: str(stats.gamesBehind) || "—",
-      streak: str(stats.streak) || "—",
+      winPercent: winPct(stats, leagueKey, wins, losses, ties),
+      gamesBehind: blank ? "—" : str(stats.gamesBehind) || "—",
+      streak: blank ? "—" : str(stats.streak) || "—",
     });
   }
   if (!rows.length) return null;
-  return { id: str(child.id) || str(child.name), name: str(child.name) || "Standings", rows };
+  return {
+    id: str(child.id) || str(child.name),
+    name: groupDisplayName(str(child.name) || "Standings", parentName),
+    rows: sortStandingRows(rows, leagueKey),
+  };
 }
 
-function collectStandingGroups(node: Record<string, unknown> | null, leagueKey: StandingsLeague, out: StandingGroup[]): void {
+function collectStandingGroups(
+  node: Record<string, unknown> | null,
+  leagueKey: StandingsLeague,
+  out: StandingGroup[],
+  parentName?: string,
+): void {
   if (!node) return;
-  const g = standingGroupFrom(node, leagueKey);
+  const g = standingGroupFrom(node, leagueKey, parentName);
   if (g) out.push(g);
+  const selfName = str(node.name) || parentName;
   for (const c of arr(node.children)) {
     const co = rec(c);
-    if (co) collectStandingGroups(co, leagueKey, out);
+    if (co) collectStandingGroups(co, leagueKey, out, selfName);
   }
+}
+
+function earlySeasonCopy(leagueKey: StandingsLeague): string {
+  switch (leagueKey) {
+    case "nfl":
+      return "NFL week 1 — records reset";
+    case "cfb":
+      return "College football is just getting started — early-season records";
+    case "nba":
+      return "NBA hasn't tipped yet — records reset";
+    case "nhl":
+      return "NHL hasn't dropped the puck — records reset";
+    case "cbb":
+      return "College hoops hasn't tipped yet — records reset";
+    default:
+      return "These clubs are still 0-0";
+  }
+}
+
+function resolveSeasonMeta(
+  leagueKey: StandingsLeague,
+  root: Record<string, unknown> | null,
+  groups: StandingGroup[],
+): { seasonLabel?: string; seasonNote?: string } {
+  if (!root) return {};
+  const now = Date.now();
+  const seasons = arr(root.seasons).map(rec).filter(Boolean) as Record<string, unknown>[];
+  let hit: { label: string; phase: string } | null = null;
+  for (const season of seasons) {
+    for (const raw of arr(season.types)) {
+      const t = rec(raw);
+      if (!t) continue;
+      const a = Date.parse(str(t.startDate));
+      const b = Date.parse(str(t.endDate));
+      if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+      if (a <= now && now < b) {
+        hit = { label: str(season.displayName) || str(season.year), phase: str(t.abbreviation) };
+        break;
+      }
+    }
+    if (hit) break;
+  }
+  const rows = groups.flatMap((g) => g.rows);
+  const allZero =
+    rows.length > 0 &&
+    rows.every((r) => r.wins === 0 && r.losses === 0 && !(r.ties ?? 0) && !(r.points ?? 0));
+  const top = rec(root.season);
+  const upcoming = str(top?.displayName) || str(top?.year);
+  // Prefer the season window we are actually in (MLB group payloads sometimes advertise next year).
+  const seasonLabel = hit?.label || upcoming || undefined;
+
+  let seasonNote: string | undefined;
+  if (hit?.phase === "off") {
+    // ESPN may already zero NHL/NBA boards during the off-season window.
+    seasonNote = allZero
+      ? earlySeasonCopy(leagueKey)
+      : `${hit.label} season is over — final standings`;
+  } else if (hit?.phase === "pre") {
+    if (allZero) seasonNote = earlySeasonCopy(leagueKey);
+    else if (leagueKey === "nba" || leagueKey === "cbb") {
+      seasonNote = `Prior season standings — ${upcoming || "the new season"} hasn't tipped yet`;
+    }
+  } else if (!hit && (leagueKey === "nba" || leagueKey === "cbb") && rows.length) {
+    const prior = str(seasons[0]?.displayName) || "Prior season";
+    seasonNote = allZero
+      ? earlySeasonCopy(leagueKey)
+      : `${prior} final standings — ${upcoming || "new season"} hasn't tipped yet`;
+  } else if (allZero) {
+    seasonNote = earlySeasonCopy(leagueKey);
+  }
+  return { seasonLabel, seasonNote };
 }
 
 export async function loadStandings(leagueKey: StandingsLeague): Promise<StandingsBoard> {
   const meta = STANDINGS_LEAGUES[leagueKey];
-  return cached(`stand:${leagueKey}`, 5 * 60_000, async () => {
+  return cached(`stand:${leagueKey}:v2`, 5 * 60_000, async () => {
     try {
-      const json = await getJson(
-        `https://site.web.api.espn.com/apis/v2/sports/${meta.sport}/${meta.league}/standings`,
-      );
       const groups: StandingGroup[] = [];
-      collectStandingGroups(rec(json), leagueKey, groups);
+      let root: Record<string, unknown> | null = null;
+      const confGroups = DIVISION_CONF_GROUPS[leagueKey];
+      if (confGroups?.length) {
+        for (const groupId of confGroups) {
+          const json = rec(
+            await getJson(
+              `https://site.web.api.espn.com/apis/v2/sports/${meta.sport}/${meta.league}/standings?group=${groupId}`,
+            ),
+          );
+          if (!root) root = json;
+          collectStandingGroups(json, leagueKey, groups);
+        }
+      } else {
+        root = rec(
+          await getJson(`https://site.web.api.espn.com/apis/v2/sports/${meta.sport}/${meta.league}/standings`),
+        );
+        collectStandingGroups(root, leagueKey, groups);
+      }
       const paGroups = groups.filter((g) => g.rows.some((r) => r.slug));
+      const { seasonLabel, seasonNote } = resolveSeasonMeta(leagueKey, root, paGroups);
       return {
         league: leagueKey,
         generatedAt: new Date().toISOString(),
         groups: paGroups,
+        seasonLabel,
+        seasonNote,
         warnings: paGroups.length ? [] : [`No standings yet for ${meta.label}. Return when the season starts.`],
       };
     } catch {
