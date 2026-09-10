@@ -120,15 +120,23 @@ export function DeskShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="mt-8 flex flex-col gap-3 border-t border-border pt-6 text-xs text-subtle sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <img
-                src="/brand/two-hounds-mark.png"
-                alt=""
-                width={28}
-                height={28}
-                className="h-7 w-7 rounded-full opacity-90"
-              />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
               <p>Keystone · a small desk for a big state.</p>
+              <a
+                href="https://twohoundsrun.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-subtle hover:text-muted"
+              >
+                <img
+                  src="/brand/two-hounds-mark.png"
+                  alt=""
+                  width={28}
+                  height={28}
+                  className="h-7 w-7 rounded-full opacity-90"
+                />
+                <span>A Two Hounds Run site</span>
+              </a>
             </div>
             <p>Lines are for information only. 21+ · If you gamble, call 1-800-GAMBLER.</p>
           </div>
