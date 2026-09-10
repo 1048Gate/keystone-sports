@@ -54,12 +54,58 @@ test('historical board fetches the requested date rather than filtering the pres
     { homeAway: 'home', team: { id: '21', abbreviation: 'PHI', displayName: 'Eagles' }, score: '21' },
     { homeAway: 'away', team: { id: '23', abbreviation: 'PIT', displayName: 'Steelers' }, score: '17' },
   ] }], status: { type: { state: 'post', shortDetail: 'Final' } } };
-  const fetch = async url => { urls.push(url); return { ok: true, json: async () => url.includes('/nfl/scoreboard') ? { events: [fixture] } : { events: [], dates: [] } }; };
+  const payload = (url) => url.includes('/nfl/scoreboard') ? { events: [fixture] } : { events: [], dates: [] };
+  const fetch = async url => {
+    urls.push(url);
+    const body = payload(String(url));
+    const raw = JSON.stringify(body);
+    return { ok: true, status: 200, json: async () => body, text: async () => raw };
+  };
   const server = moduleFunctions('src/lib/sports/server.ts', ['loadToday', 'parseEspnEvent'], { SportsCache, ...identity, ...time, ...teams, ...briefs, fetch });
   const board = await server.loadToday('2020-01-01');
-  assert(urls.some(u => new URL(u).searchParams.get('dates') === '20200101'));
+  const dateParams = urls.map(u => new URL(u).searchParams.get('dates')).filter(Boolean);
+  // One window (day-2..day+10), not a separate single-day + nearby pair.
+  assert(dateParams.includes('20191230-20200111'));
+  assert(!dateParams.includes('20200101'));
   assert.equal(board.games[0].dateKey, '2020-01-01'); assert.equal(board.games[0].home.score, '21');
   assert.equal(server.parseEspnEvent({ ...fixture, status: { type: { state: 'pre', shortDetail: 'Postponed' } } }, 'nfl').statusText, 'Postponed');
+});
+
+test('loadToday does not double-fetch every league scoreboard', async () => {
+  const urls = [];
+  const fetch = async url => {
+    urls.push(url);
+    const body = { events: [], dates: [] };
+    const raw = JSON.stringify(body);
+    return { ok: true, status: 200, json: async () => body, text: async () => raw };
+  };
+  const server = moduleFunctions('src/lib/sports/server.ts', ['loadToday'], { SportsCache, ...identity, ...time, ...teams, ...briefs, fetch });
+  await server.loadToday('2026-09-10');
+  const scoreboardUrls = urls.filter(u => String(u).includes('/scoreboard'));
+  // Five in-season leagues (NBA/NCAAB skipped in September) × one window.
+  assert.equal(scoreboardUrls.length, 5);
+  assert(scoreboardUrls.every(u => new URL(u).searchParams.get('dates') === '20260908-20260920'));
+});
+
+test('college team hubs use espnId and survive schedule failure', async () => {
+  const urls = [];
+  const fetch = async url => {
+    urls.push(String(url));
+    if (String(url).includes('/schedule')) throw new Error('upstream down');
+    if (String(url).includes('/news')) return { ok: true, json: async () => ({ articles: [] }) };
+    if (String(url).includes('/teams/')) return { ok: true, json: async () => ({ team: { record: { items: [{ summary: '1-0' }] } } }) };
+    return { ok: true, text: async () => '<feed></feed>', json: async () => ({}) };
+  };
+  const server = moduleFunctions('src/lib/sports/server.ts', ['loadTeamPage', 'scheduleTeamId'], { SportsCache, ...identity, ...time, ...teams, ...briefs, fetch });
+  assert.equal(server.scheduleTeamId(teams.TEAM_BY_SLUG['penn-state']), '213');
+  assert.equal(server.scheduleTeamId(teams.TEAM_BY_SLUG['temple']), '218');
+  assert.equal(server.scheduleTeamId(teams.TEAM_BY_SLUG['eagles']), 'phi');
+  const page = await server.loadTeamPage('penn-state');
+  assert.equal(page.slug, 'penn-state');
+  assert(Array.isArray(page.games));
+  assert(page.warnings?.length);
+  assert(urls.some(u => u.includes('/college-football/teams/213/schedule')));
+  assert(!urls.some(u => u.includes('/college-football/teams/psu/schedule')));
 });
 test('publisher rejects anonymous, wrong-owner and unconfigured identities', () => {
   for (const headers of [{}, { 'oai-authenticated-user-id': 'other', 'oai-authenticated-user-email': 'other@example.com' }, { 'cf-access-authenticated-user-email': 'other@example.com' }]) {

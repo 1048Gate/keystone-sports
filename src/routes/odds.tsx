@@ -3,6 +3,8 @@ import { useMemo, useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { FilterChips } from "@/components/filter-chips";
 import { PendingScreen } from "@/components/pending-screen";
+import { RouteError } from "@/components/route-error";
+
 import { getTodayBoard } from "@/lib/sports/api";
 import { applyView, sortFollowed } from "@/lib/sports/filter";
 import { useFollows } from "@/lib/sports/follow-store";
@@ -18,6 +20,7 @@ export const Route = createFileRoute("/odds")({
   loader: () => getTodayBoard({ data: {} }),
   staleTime: 20_000,
   pendingComponent: PendingScreen,
+  errorComponent: RouteError,
   head: () => ({
     meta: [{ title: "Odds — Keystone" }],
   }),
