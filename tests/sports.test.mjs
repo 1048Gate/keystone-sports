@@ -305,3 +305,47 @@ test('standings label NBA off-season finals from ESPN season types', async () =>
   assert.equal(board.groups[0].name.includes('Atlantic'), true);
   assert.equal(board.groups[0].rows[0].slug, 'sixers');
 });
+
+test('Draft Kings provider labels normalize to DraftKings', () => {
+  const server = moduleFunctions('src/lib/sports/server.ts', ['normalizeProvider', 'parseEspnEvent'], {
+    SportsCache, ...identity, ...time, ...teams, ...briefs,
+    fetch: async () => ({ ok: true, json: async () => ({}) }),
+  });
+  assert.equal(server.normalizeProvider('Draft Kings'), 'DraftKings');
+  assert.equal(server.normalizeProvider('draftkings'), 'DraftKings');
+  assert.equal(server.normalizeProvider('DraftKings'), 'DraftKings');
+  assert.equal(server.normalizeProvider('ESPN BET'), 'ESPN BET');
+
+  const fixture = {
+    id: '401',
+    date: '2026-09-10T23:15:00Z',
+    name: 'Philadelphia Eagles at Dallas Cowboys',
+    shortName: 'PHI @ DAL',
+    competitions: [{
+      date: '2026-09-10T23:15:00Z',
+      competitors: [
+        { homeAway: 'away', team: { id: '21', abbreviation: 'PHI', displayName: 'Philadelphia Eagles', logo: 'http://a.espncdn.com/i/teamlogos/nfl/500/phi.png' } },
+        { homeAway: 'home', team: { id: '6', abbreviation: 'DAL', displayName: 'Dallas Cowboys', logo: 'https://a.espncdn.com/i/teamlogos/nfl/500/dal.png' } },
+      ],
+      odds: [{ provider: { name: 'Draft Kings' }, details: 'DAL -3.5', overUnder: '47.5', homeTeamOdds: { moneyLine: -180 }, awayTeamOdds: { moneyLine: 150 } }],
+      status: { type: { state: 'pre', shortDetail: '8:15 PM ET' } },
+    }],
+    links: [{ href: 'http://www.espn.com/nfl/game/_/gameId/401' }],
+    status: { type: { state: 'pre', shortDetail: '8:15 PM ET' } },
+  };
+  const game = server.parseEspnEvent(fixture, 'nfl');
+  assert.equal(game.odds.provider, 'DraftKings');
+  assert.equal(game.sourceUrl, 'https://www.espn.com/nfl/game/_/gameId/401');
+  assert.match(game.away.logo, /^https:\/\/a\.espncdn\.com\//);
+});
+
+test('ensureEspnHttps upgrades ESPN hosts only', () => {
+  const server = moduleFunctions('src/lib/sports/server.ts', ['ensureEspnHttps'], {
+    SportsCache, ...identity, ...time, ...teams, ...briefs,
+    fetch: async () => ({ ok: true, json: async () => ({}) }),
+  });
+  assert.equal(server.ensureEspnHttps('http://www.espn.com/story'), 'https://www.espn.com/story');
+  assert.equal(server.ensureEspnHttps('https://www.espn.com/story'), 'https://www.espn.com/story');
+  assert.equal(server.ensureEspnHttps('http://example.com/x'), 'http://example.com/x');
+  assert.equal(server.ensureEspnHttps(undefined), undefined);
+});

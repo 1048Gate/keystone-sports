@@ -70,7 +70,7 @@ function WeekStrip({
 }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(origin, i));
   return (
-    <div className="-mx-1 mt-5 flex gap-1.5 overflow-x-auto px-1 pb-1">
+    <div className="no-scrollbar -mx-1 mt-5 flex gap-1.5 overflow-x-auto px-1 pb-1">
       {days.map((key, i) => {
         const active = key === selected;
         const n = counts[key] ?? 0;

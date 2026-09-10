@@ -1,6 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { CalendarDays, Newspaper, Shield, Table2, Trophy } from "lucide-react";
+import { CalendarDays, ListOrdered, Newspaper, NotebookPen, Shield, Table2, Trophy } from "lucide-react";
 import { ScoreTicker } from "@/components/score-ticker";
 import { teamsByFollowed } from "@/data/teams";
 import { useDesk } from "@/lib/sports/desk-store";
@@ -19,9 +19,11 @@ const NAV = [
 const TABS = [
   { to: "/", label: "Scores", icon: Trophy },
   { to: "/calendar", label: "Calendar", icon: CalendarDays },
+  { to: "/standings", label: "Standings", icon: ListOrdered },
   { to: "/odds", label: "Odds", icon: Table2 },
   { to: "/news", label: "News", icon: Newspaper },
   { to: "/teams", label: "Teams", icon: Shield },
+  { to: "/desk", label: "Notes", icon: NotebookPen },
 ] as const;
 
 function KeystoneMark({ className }: { className?: string }) {
@@ -143,7 +145,7 @@ export function DeskShell({ children }: { children: ReactNode }) {
         </div>
       </footer>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden">
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-7">
           {TABS.map((item) => {
             const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             const Icon = item.icon;
@@ -152,11 +154,11 @@ export function DeskShell({ children }: { children: ReactNode }) {
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs font-semibold",
+                  "flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 text-[10px] font-semibold leading-tight sm:text-xs",
                   active ? "text-accent" : "text-muted",
                 )}
               >
-                <Icon className="h-5 w-5" strokeWidth={active ? 2.4 : 1.8} />
+                <Icon className="h-5 w-5 shrink-0" strokeWidth={active ? 2.4 : 1.8} />
                 {item.label}
               </Link>
             );

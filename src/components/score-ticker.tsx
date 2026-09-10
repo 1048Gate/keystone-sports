@@ -144,7 +144,7 @@ export function ScoreTicker() {
 
   return (
     <div className="bg-scoreboard">
-      <div className="flex overflow-x-auto">
+      <div className="no-scrollbar flex overflow-x-auto">
         <p className="flex h-12 shrink-0 items-center bg-accent px-3 text-xs font-semibold uppercase tracking-widest text-accent-fg">
           {games.some((g) => g.status === "in") ? "Live" : games.some((g) => g.status === "post") ? "Scores" : "Next"}
         </p>
