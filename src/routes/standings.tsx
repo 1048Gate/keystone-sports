@@ -40,18 +40,37 @@ export const Route = createFileRoute("/standings")({
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => getStandings({ data: { league: deps.league } }),
   staleTime: 60_000,
-  head: () => ({ meta: [{ title: "Standings — Keystone" }] }),
+  head: () => ({ meta: [{ title: "Pennsylvania standings — Keystone" }] }),
   component: StandingsPage,
 });
+
+function pageHeading(league: StandingsLeague): string {
+  switch (league) {
+    case "cfb":
+      return "Pennsylvania CFB";
+    case "cbb":
+      return "Pennsylvania college basketball";
+    case "nfl":
+      return "NFL — Pennsylvania";
+    case "mlb":
+      return "MLB — Pennsylvania";
+    case "nba":
+      return "NBA — Pennsylvania";
+    case "nhl":
+      return "NHL — Pennsylvania";
+    default:
+      return "Pennsylvania standings";
+  }
+}
 
 function StandingsPage() {
   const board = Route.useLoaderData();
   const cols = COLS[board.league] ?? COLS.nfl;
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">Standings</h1>
+      <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">{pageHeading(board.league)}</h1>
       <p className="mt-3 max-w-xl text-muted">
-        Where the Pennsylvania clubs sit. Ours are marked and linked.
+        Division and conference tables around the Keystone clubs — not a full national board. Ours are marked and linked.
       </p>
       <div className="mt-6 flex flex-wrap gap-2">
         {LEAGUES.map((l) => (

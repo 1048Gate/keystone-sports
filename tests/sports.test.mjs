@@ -259,11 +259,13 @@ test('standings ignore CFB subcategory stat overwrites and sort by win percent',
   assert.equal(psu.streak, 'W1');
   assert.equal(psu.gamesBehind, '0.5');
   assert.deepEqual(cfb.groups[0].rows.map(r => r.abbr), ['PSU', 'IND']);
+  assert.equal(cfb.groups[0].name, 'Big Ten — Penn State');
 
   const mlb = await server.loadStandings('mlb');
   assert(urls.some(u => String(u).includes('group=8')));
   const east = mlb.groups.find(g => /East/i.test(g.name));
   assert(east, 'expected NL East group');
+  assert.equal(east.name, 'NL East');
   assert.deepEqual(east.rows.map(r => r.abbr), ['ATL', 'PHI', 'SF']);
   assert.equal(east.rows[1].slug, 'phillies');
 });
@@ -303,7 +305,7 @@ test('standings label NBA off-season finals from ESPN season types', async () =>
   const board = await server.loadStandings('nba');
   assert.match(board.seasonNote || '', /season is over|final standings/i);
   assert.equal(board.seasonLabel, '2025-26');
-  assert.equal(board.groups[0].name.includes('Atlantic'), true);
+  assert.equal(board.groups[0].name, 'Atlantic Division');
   assert.equal(board.groups[0].rows[0].slug, 'sixers');
 });
 
