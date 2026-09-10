@@ -1,4 +1,5 @@
 import { SportsCache } from './cache';
+import { normalizeBookName } from './providers';
 import { sameGame } from './identity';
 import { briefCacheKey, briefFacts, type BriefInput } from './brief';
 import { applyView } from './filter';
@@ -220,11 +221,9 @@ function spreadLine(first: Record<string, unknown>): string | undefined {
 }
 
 
-/** Canonical sportsbook labels — ESPN sometimes returns a spaced "Draft Kings". */
+/** Canonical sportsbook labels — see `./providers` (`normalizeBookName`). */
 function normalizeProvider(name: string): string {
-  const trimmed = name.trim();
-  if (/^draft\s*kings$/i.test(trimmed)) return "DraftKings";
-  return trimmed;
+  return normalizeBookName(name);
 }
 
 /** Upgrade ESPN http links to https when the host is clearly ESPN. */
