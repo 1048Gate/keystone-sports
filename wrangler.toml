@@ -24,7 +24,7 @@ KEYSTONE_AI_ENABLED = "true"
 # Beat Module — D1 public strip on /news when ON. Default OFF until Collin verifies + flips.
 # Preview: set KEYSTONE_BEAT_M1 = "true" on the preview Worker / wrangler vars.
 # Public path never serves beat-poc.json fixtures.
-KEYSTONE_BEAT_M1 = "false"
+KEYSTONE_BEAT_M1 = "true"
 
 # Secrets (set with wrangler secret put, NOT in this file):
 #   AI_API_KEY  (Groq key, console.groq.com)   -> wrangler secret put AI_API_KEY
