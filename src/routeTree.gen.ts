@@ -19,6 +19,7 @@ import { Route as OddsRouteImport } from './routes/odds'
 import { Route as StandingsRouteImport } from './routes/standings'
 import { Route as ApiAutoRecapRouteImport } from './routes/api/auto-recap'
 import { Route as ApiStandingsDebugRouteImport } from './routes/api/standings-debug'
+import { Route as EditorBeatRouteImport } from './routes/editor.beat'
 import { Route as TeamsIndexRouteImport } from './routes/teams/index'
 import { Route as TeamsSlugRouteImport } from './routes/teams/$slug'
 
@@ -72,6 +73,11 @@ const ApiStandingsDebugRoute = ApiStandingsDebugRouteImport.update({
   path: '/api/standings-debug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EditorBeatRoute = EditorBeatRouteImport.update({
+  id: '/beat',
+  path: '/beat',
+  getParentRoute: () => EditorRoute,
+} as any)
 const TeamsIndexRoute = TeamsIndexRouteImport.update({
   id: '/teams/',
   path: '/teams/',
@@ -87,13 +93,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/calendar': typeof CalendarRoute
   '/desk': typeof DeskRoute
-  '/editor': typeof EditorRoute
+  '/editor': typeof EditorRouteWithChildren
   '/game': typeof GameRoute
   '/news': typeof NewsRoute
   '/odds': typeof OddsRoute
   '/standings': typeof StandingsRoute
   '/api/auto-recap': typeof ApiAutoRecapRoute
   '/api/standings-debug': typeof ApiStandingsDebugRoute
+  '/editor/beat': typeof EditorBeatRoute
   '/teams/$slug': typeof TeamsSlugRoute
   '/teams/': typeof TeamsIndexRoute
 }
@@ -101,13 +108,14 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/calendar': typeof CalendarRoute
   '/desk': typeof DeskRoute
-  '/editor': typeof EditorRoute
+  '/editor': typeof EditorRouteWithChildren
   '/game': typeof GameRoute
   '/news': typeof NewsRoute
   '/odds': typeof OddsRoute
   '/standings': typeof StandingsRoute
   '/api/auto-recap': typeof ApiAutoRecapRoute
   '/api/standings-debug': typeof ApiStandingsDebugRoute
+  '/editor/beat': typeof EditorBeatRoute
   '/teams/$slug': typeof TeamsSlugRoute
   '/teams': typeof TeamsIndexRoute
 }
@@ -116,13 +124,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/calendar': typeof CalendarRoute
   '/desk': typeof DeskRoute
-  '/editor': typeof EditorRoute
+  '/editor': typeof EditorRouteWithChildren
   '/game': typeof GameRoute
   '/news': typeof NewsRoute
   '/odds': typeof OddsRoute
   '/standings': typeof StandingsRoute
   '/api/auto-recap': typeof ApiAutoRecapRoute
   '/api/standings-debug': typeof ApiStandingsDebugRoute
+  '/editor/beat': typeof EditorBeatRoute
   '/teams/$slug': typeof TeamsSlugRoute
   '/teams/': typeof TeamsIndexRoute
 }
@@ -139,6 +148,7 @@ export interface FileRouteTypes {
     | '/standings'
     | '/api/auto-recap'
     | '/api/standings-debug'
+    | '/editor/beat'
     | '/teams/$slug'
     | '/teams/'
   fileRoutesByTo: FileRoutesByTo
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/standings'
     | '/api/auto-recap'
     | '/api/standings-debug'
+    | '/editor/beat'
     | '/teams/$slug'
     | '/teams'
   id:
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/standings'
     | '/api/auto-recap'
     | '/api/standings-debug'
+    | '/editor/beat'
     | '/teams/$slug'
     | '/teams/'
   fileRoutesById: FileRoutesById
@@ -175,7 +187,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CalendarRoute: typeof CalendarRoute
   DeskRoute: typeof DeskRoute
-  EditorRoute: typeof EditorRoute
+  EditorRoute: typeof EditorRouteWithChildren
   GameRoute: typeof GameRoute
   NewsRoute: typeof NewsRoute
   OddsRoute: typeof OddsRoute
@@ -258,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStandingsDebugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/editor/beat': {
+      id: '/editor/beat'
+      path: '/beat'
+      fullPath: '/editor/beat'
+      preLoaderRoute: typeof EditorBeatRouteImport
+      parentRoute: typeof EditorRoute
+    }
     '/teams/': {
       id: '/teams/'
       path: '/teams'
@@ -275,11 +294,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface EditorRouteChildren {
+  EditorBeatRoute: typeof EditorBeatRoute
+}
+
+const EditorRouteChildren: EditorRouteChildren = {
+  EditorBeatRoute: EditorBeatRoute,
+}
+
+const EditorRouteWithChildren =
+  EditorRoute._addFileChildren(EditorRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CalendarRoute: CalendarRoute,
   DeskRoute: DeskRoute,
-  EditorRoute: EditorRoute,
+  EditorRoute: EditorRouteWithChildren,
   GameRoute: GameRoute,
   NewsRoute: NewsRoute,
   OddsRoute: OddsRoute,

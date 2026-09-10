@@ -7,7 +7,7 @@ export interface Statement {
   run(): Promise<unknown>;
 }
 export interface Database { prepare(sql: string): Statement; batch(statements: Statement[]): Promise<unknown[]> }
-type Runtime = { DB?: Database; AI_API_KEY?: string; AI_MODEL?: string; AI_BASE_URL?: string; KEYSTONE_ADMIN_EMAIL?: string; KEYSTONE_AI_ENABLED?: string };
+type Runtime = { DB?: Database; AI_API_KEY?: string; AI_MODEL?: string; AI_BASE_URL?: string; KEYSTONE_ADMIN_EMAIL?: string; KEYSTONE_AI_ENABLED?: string; KEYSTONE_BEAT_M1?: string };
 export function runtime(): Runtime { return env as Runtime; }
 export function db(): Database {
   const binding = runtime().DB;
