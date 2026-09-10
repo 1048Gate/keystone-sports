@@ -36,50 +36,54 @@ function BeatModuleInner({ items }: Props) {
     [filter, items],
   );
 
-  if (!items.length) return null;
-
   return (
     <section className="mt-8" aria-label="Beat desk">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl tracking-wide">Beat desk</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted">
-            Curated fixtures for Keystone Beat M1 — short context, original source always linked. Not live scraping.
+            Curated PA sports desk — short Keystone context, original source always linked. Manual approval only.
           </p>
         </div>
       </div>
 
-      <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {FILTERS.map((key) => {
-          const label = key === "all" ? "All" : BEAT_CATEGORY_LABELS[key];
-          const active = filter === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setFilter(key)}
-              className={
-                active
-                  ? "shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-primary-fg"
-                  : "shrink-0 rounded-full bg-elevated px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted hover:text-fg"
-              }
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
+      {!items.length ? (
+        <p className="mt-4 text-sm text-muted">No Beat cards right now. News RSS and Film Room hubs below still work.</p>
+      ) : (
+        <>
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {FILTERS.map((key) => {
+              const label = key === "all" ? "All" : BEAT_CATEGORY_LABELS[key];
+              const active = filter === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFilter(key)}
+                  className={
+                    active
+                      ? "shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-primary-fg"
+                      : "shrink-0 rounded-full bg-elevated px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted hover:text-fg"
+                  }
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
 
-      <ul className="mt-4 grid gap-4 sm:grid-cols-2">
-        {visible.map((item) => (
-          <li key={item.id}>
-            <BeatCard item={item} />
-          </li>
-        ))}
-      </ul>
-      {!visible.length ? (
-        <p className="mt-4 text-sm text-muted">No cards in this category right now.</p>
-      ) : null}
+          <ul className="mt-4 grid gap-4 sm:grid-cols-2">
+            {visible.map((item) => (
+              <li key={item.id}>
+                <BeatCard item={item} />
+              </li>
+            ))}
+          </ul>
+          {!visible.length ? (
+            <p className="mt-4 text-sm text-muted">No cards in this category right now.</p>
+          ) : null}
+        </>
+      )}
     </section>
   );
 }

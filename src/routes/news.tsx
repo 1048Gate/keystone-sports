@@ -46,7 +46,7 @@ function NewsPage() {
         The beat, the local papers, and the locker room. Film rooms link out to the clubs — we don't host the tape.
       </p>
 
-      {beat.enabled && beat.items.length ? <BeatModule items={beat.items} generatedAt={beat.generatedAt} /> : null}
+      {beat.enabled ? <BeatModule items={beat.items} generatedAt={beat.generatedAt} /> : null}
 
       {highlights.length ? (
         <section className="mt-8" aria-label="Highlights">

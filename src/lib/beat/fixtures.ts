@@ -1,7 +1,11 @@
 import type { BeatItem } from "./types";
 import raw from "@/data/beat-poc.json";
 
-/** Statically imported fixtures — no network, no ESPN calls for Beat M1. */
+/**
+ * Dev/test fixtures ONLY.
+ * Public `getBeatDesk` never loads this file — production reads D1 approved rows.
+ * Keep for unit tests + local layout checks (`KEYSTONE_BEAT_USE_FIXTURES` is intentionally unused on the public path).
+ */
 export const BEAT_POC_FIXTURES = raw as BeatItem[];
 
 export function beatFixtureInventory() {
@@ -15,6 +19,6 @@ export function beatFixtureInventory() {
     total: BEAT_POC_FIXTURES.length,
     byCategory,
     byMedia,
-    publicEligibleHint: "approved + not expired (see selectPublicBeatItems)",
+    publicEligibleHint: "approved + not expired (see selectPublicBeatItems) — fixtures are not a prod source",
   };
 }

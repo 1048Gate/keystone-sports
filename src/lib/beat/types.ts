@@ -1,4 +1,4 @@
-/** Keystone Beat Module — shared types (M1 fixtures + future D1). */
+/** Keystone Beat Module — shared types (D1 + fixtures for tests/dev only). */
 
 export type BeatCategory =
   | "breaking"
@@ -33,7 +33,7 @@ export type BeatItem = {
   originalUrl: string;
   embedUrl?: string;
   embedId?: string;
-  /** Cached X oEmbed HTML without script tags (optional for M1). */
+  /** Cached X oEmbed HTML without script tags. */
   oembedHtml?: string;
   timestamp: string;
   mediaType: BeatMediaType;
@@ -44,6 +44,9 @@ export type BeatItem = {
   approvedBy?: string;
   approvedAt?: string;
   pinned?: boolean;
+  /** Discovery scoring (candidates); optional on curated rows. */
+  relevanceScore?: number;
+  duplicateFingerprint?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -87,7 +90,15 @@ export const SOURCE_TIER_LABELS: Record<SourceTier, string> = {
   aggregator: "Aggregator",
 };
 
-/** Future editor controls (M3+). Documented + stubbed in admin UI. */
+export const BEAT_CATEGORIES: BeatCategory[] = [
+  "breaking",
+  "from_the_beat",
+  "watch",
+  "locker_room",
+  "reaction",
+];
+
+/** Editor controls (M2+ D1). */
 export type BeatEditorAction =
   | "approve"
   | "reject"
@@ -96,3 +107,25 @@ export type BeatEditorAction =
   | "pin"
   | "expire"
   | "open_original";
+
+/** Discovery candidate before / while pending in beat_items. */
+export type BeatDiscoveryCandidate = {
+  originalUrl: string;
+  account: string;
+  teamSlug?: string;
+  categoryRecommendation: BeatCategory;
+  timestamp: string;
+  sourceTier: SourceTier;
+  verifiedOfficial: boolean;
+  suggestedContext: string;
+  headline: string;
+  source: string;
+  mediaType: BeatMediaType;
+  embedUrl?: string;
+  embedId?: string;
+  oembedHtml?: string;
+  relevanceScore: number;
+  duplicateFingerprint: string;
+  proposedExpiration?: string;
+  league?: string;
+};
