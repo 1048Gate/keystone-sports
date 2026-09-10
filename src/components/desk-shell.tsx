@@ -119,27 +119,21 @@ export function DeskShell({ children }: { children: ReactNode }) {
               ))}
             </div>
           </div>
-          <div className="mt-8 flex flex-col gap-1 border-t border-border pt-6 text-xs text-subtle sm:flex-row sm:justify-between">
-            <p>Keystone · a small desk for a big state.</p>
+          <div className="mt-8 flex flex-col gap-3 border-t border-border pt-6 text-xs text-subtle sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <img
+                src="/brand/two-hounds-mark.png"
+                alt=""
+                width={28}
+                height={28}
+                className="h-7 w-7 rounded-full opacity-90"
+              />
+              <p>Keystone · a small desk for a big state.</p>
+            </div>
             <p>Lines are for information only. 21+ · If you gamble, call 1-800-GAMBLER.</p>
           </div>
         </div>
       </footer>
-      <a
-        href="https://twohoundsrun.com"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Two Hounds Run"
-        className="pointer-events-auto fixed bottom-4 right-4 z-20 hidden h-11 w-11 rounded-full opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:block"
-      >
-        <img
-          src="/brand/two-hounds-mark.png"
-          alt=""
-          width={44}
-          height={44}
-          className="h-11 w-11 rounded-full"
-        />
-      </a>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden">
         <div className="grid grid-cols-5">
           {TABS.map((item) => {
