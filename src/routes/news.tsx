@@ -1,15 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PendingScreen } from "@/components/pending-screen";
 import { RouteError } from "@/components/route-error";
+import { BeatModule } from "@/components/beat/beat-module";
 
 import { TEAM_BY_SLUG } from "@/data/teams";
 import { getNewsWire } from "@/lib/sports/api";
+import { getBeatDesk } from "@/lib/beat/api";
 import { rankPaNews } from "@/lib/sports/filter";
 import { useFollows } from "@/lib/sports/follow-store";
 import { relativeWhen } from "@/lib/sports/time";
 
 export const Route = createFileRoute("/news")({
-  loader: () => getNewsWire(),
+  loader: async () => {
+    const [wire, beat] = await Promise.all([getNewsWire(), getBeatDesk()]);
+    return { wire, beat };
+  },
   staleTime: 60_000,
   pendingComponent: PendingScreen,
   errorComponent: RouteError,
@@ -20,7 +25,7 @@ export const Route = createFileRoute("/news")({
 });
 
 function NewsPage() {
-  const wire = Route.useLoaderData();
+  const { wire, beat } = Route.useLoaderData();
   const followed = useFollows((s) => s.slugs);
   const ranked = rankPaNews(wire.articles, followed);
   const lead = ranked.find((a) => a.image) ?? ranked[0];
@@ -40,6 +45,8 @@ function NewsPage() {
       <p className="mt-3 max-w-2xl text-muted">
         The beat, the local papers, and the locker room. Film rooms link out to the clubs — we don't host the tape.
       </p>
+
+      {beat.enabled && beat.items.length ? <BeatModule items={beat.items} generatedAt={beat.generatedAt} /> : null}
 
       {highlights.length ? (
         <section className="mt-8" aria-label="Highlights">
