@@ -9,6 +9,7 @@ import { getTodayBoard } from "@/lib/sports/api";
 import { applyView, sortFollowed } from "@/lib/sports/filter";
 import { useFollows } from "@/lib/sports/follow-store";
 import { parseRegion, writePrefs } from "@/lib/sports/prefs";
+import { normalizeBookName } from "@/lib/sports/providers";
 import { addDays, formatKick } from "@/lib/sports/time";
 
 type Search = { region?: string };
@@ -91,7 +92,7 @@ function OddsPage() {
                     <p className="font-semibold">
                       {g.away.abbr} @ {g.home.abbr}
                     </p>
-                    <p className="text-xs text-muted">{g.league} · {g.odds?.provider || "No line posted"}</p>
+                    <p className="text-xs text-muted">{g.league} · {(g.odds?.provider && normalizeBookName(g.odds.provider)) || "No line posted"}</p>
                   </td>
                   <td className="px-4 py-3 text-xs tabular-nums text-muted">{formatKick(g.start)}</td>
                   <td className="px-4 py-3 tabular-nums">{g.odds?.spread ?? g.odds?.details ?? "—"}</td>
@@ -118,7 +119,7 @@ function OddsPage() {
         <div className="mt-6 space-y-3 md:hidden">
           {pool.map((g) => (
             <article key={g.id} className="rounded-md bg-surface p-4 shadow-[var(--shadow-border)]">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted">{g.league} · {g.odds?.provider || "No line posted"}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">{g.league} · {(g.odds?.provider && normalizeBookName(g.odds.provider)) || "No line posted"}</p>
               <p className="mt-1 font-display text-xl tracking-wide">
                 {g.away.abbr} @ {g.home.abbr}
               </p>

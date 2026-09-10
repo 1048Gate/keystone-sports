@@ -1,4 +1,5 @@
 import { SportsCache } from './cache';
+import { normalizeBookName } from './providers';
 import { sameGame } from './identity';
 import { briefCacheKey, briefFacts, type BriefInput } from './brief';
 import { applyView } from './filter';
@@ -220,11 +221,9 @@ function spreadLine(first: Record<string, unknown>): string | undefined {
 }
 
 
-/** Canonical sportsbook labels — ESPN sometimes returns a spaced "Draft Kings". */
+/** Canonical sportsbook labels — see `./providers` (`normalizeBookName`). */
 function normalizeProvider(name: string): string {
-  const trimmed = name.trim();
-  if (/^draft\s*kings$/i.test(trimmed)) return "DraftKings";
-  return trimmed;
+  return normalizeBookName(name);
 }
 
 /** Upgrade ESPN http links to https when the host is clearly ESPN. */
@@ -1136,19 +1135,85 @@ function sortStandingRows(rows: StandingRow[], leagueKey: StandingsLeague): Stan
   });
 }
 
+/** Short, desk-standard division/conference labels (PA context, not national fill). */
 function groupDisplayName(nodeName: string, parentName?: string): string {
-  if (!parentName) return nodeName || "Standings";
-  if (!nodeName) return parentName;
-  if (nodeName.includes(parentName) || parentName.includes(nodeName)) return nodeName;
-  // NBA children are short ("Atlantic"); AFC/NFC/division titles already stand alone.
-  if (
-    /conference/i.test(parentName) &&
-    !/conference|league|division|\bafc\b|\bnfc\b/i.test(nodeName)
-  ) {
-    const short = parentName.replace(/\s+Conference$/i, "");
-    return `${short} · ${nodeName}`;
+  const raw = (nodeName || "").trim();
+  const parent = (parentName || "").trim();
+
+  // MLB: "National League East" → "NL East"
+  const mlb = raw.match(/^(National|American)\s+League\s+(East|Central|West)$/i);
+  if (mlb) {
+    const league = /^National/i.test(mlb[1]) ? "NL" : "AL";
+    const div = mlb[2].charAt(0).toUpperCase() + mlb[2].slice(1).toLowerCase();
+    return `${league} ${div}`;
   }
-  return nodeName;
+
+  // NFL: keep "AFC North" / "NFC East"
+  const nfl = raw.match(/^(AFC|NFC)\s+(East|North|South|West)$/i);
+  if (nfl) {
+    return `${nfl[1].toUpperCase()} ${nfl[2].charAt(0).toUpperCase()}${nfl[2].slice(1).toLowerCase()}`;
+  }
+
+  // NHL: "Metropolitan Division" already reads clearly
+  if (/\s+Division$/i.test(raw)) return raw;
+
+  // College conferences → short forms (PA team appended later)
+  const conf: Array<[RegExp, string]> = [
+    [/^Big Ten(\s+Conference)?$/i, "Big Ten"],
+    [/^Atlantic Coast(\s+Conference)?$/i, "ACC"],
+    [/^American(\s+Athletic)?(\s+Conference)?$/i, "American"],
+    [/^Big East(\s+Conference)?$/i, "Big East"],
+    [/^Southeastern(\s+Conference)?$/i, "SEC"],
+    [/^Big 12(\s+Conference)?$/i, "Big 12"],
+    [/^Conference USA$/i, "CUSA"],
+    [/^Mid-American(\s+Conference)?$/i, "MAC"],
+    [/^Mountain West(\s+Conference)?$/i, "Mountain West"],
+    [/^Pac-12(\s+Conference)?$/i, "Pac-12"],
+    [/^FBS Independents$/i, "Independents"],
+    [/^Ivy League$/i, "Ivy League"],
+    [/^Patriot League$/i, "Patriot League"],
+    [/^Atlantic 10(\s+Conference)?$/i, "Atlantic 10"],
+  ];
+  for (const [re, label] of conf) {
+    if (re.test(raw)) return label;
+  }
+
+  if (!raw) return parent || "Around the division";
+  if (!parent) return raw === "Standings" ? "Around the division" : raw;
+  if (raw.includes(parent) || parent.includes(raw)) return raw;
+
+  // NBA children are short ("Atlantic") — prefer "Atlantic Division" over bare names
+  if (
+    /conference/i.test(parent) &&
+    !/conference|league|division|\bafc\b|\bnfc\b/i.test(raw)
+  ) {
+    return `${raw} Division`;
+  }
+  return raw === "Standings" ? "Around the division" : raw;
+}
+
+/** Attach PA club short names to college conference headings (Big Ten — Penn State). */
+function annotatePaStandingGroup(group: StandingGroup, leagueKey: StandingsLeague): StandingGroup {
+  let name = group.name;
+  if (/^standings$/i.test(name) || !name.trim()) name = "Around the division";
+
+  if (leagueKey === "cfb" || leagueKey === "cbb") {
+    const paLabels: string[] = [];
+    for (const row of group.rows) {
+      if (!row.slug) continue;
+      const club = TEAM_BY_SLUG[row.slug];
+      const label = club?.shortName || row.abbr;
+      if (label && !paLabels.includes(label)) paLabels.push(label);
+    }
+    if (paLabels.length && !paLabels.some((l) => name.includes(l))) {
+      name = `${name} — ${paLabels.join(", ")}`;
+    } else if (leagueKey === "cfb" && !paLabels.length && !/Pennsylvania/i.test(name)) {
+      // Should not happen for filtered PA groups, but keep scope obvious
+      name = name.startsWith("Pennsylvania") ? name : `Pennsylvania CFB · ${name}`;
+    }
+  }
+
+  return name === group.name ? group : { ...group, name };
 }
 
 function standingGroupFrom(child: Record<string, unknown>, leagueKey: StandingsLeague, parentName?: string): StandingGroup | null {
@@ -1286,7 +1351,7 @@ function resolveSeasonMeta(
 
 export async function loadStandings(leagueKey: StandingsLeague): Promise<StandingsBoard> {
   const meta = STANDINGS_LEAGUES[leagueKey];
-  return cached(`stand:${leagueKey}:v2`, 5 * 60_000, async () => {
+  return cached(`stand:${leagueKey}:v3`, 5 * 60_000, async () => {
     try {
       const groups: StandingGroup[] = [];
       let root: Record<string, unknown> | null = null;
@@ -1307,7 +1372,9 @@ export async function loadStandings(leagueKey: StandingsLeague): Promise<Standin
         );
         collectStandingGroups(root, leagueKey, groups);
       }
-      const paGroups = groups.filter((g) => g.rows.some((r) => r.slug));
+      const paGroups = groups
+        .filter((g) => g.rows.some((r) => r.slug))
+        .map((g) => annotatePaStandingGroup(g, leagueKey));
       const { seasonLabel, seasonNote } = resolveSeasonMeta(leagueKey, root, paGroups);
       return {
         league: leagueKey,

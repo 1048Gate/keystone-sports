@@ -13,6 +13,7 @@ const identity = moduleFunctions('src/lib/sports/identity.ts', ['sameGame', 'uni
 const time = moduleFunctions('src/lib/sports/time.ts', ['validDate', 'checkedDate', 'addDays', 'dateKeyNY', 'espnDateParam', 'monthBounds']);
 const briefs = moduleFunctions('src/lib/sports/brief.ts', ['briefFacts', 'briefCacheKey']);
 const teams = moduleFunctions('src/data/teams.ts', ['TEAMS', 'TEAM_BY_SLUG', 'ESPN_INDEX', 'MLB_INDEX', 'espnLogo', 'lookupSlug']);
+const providers = moduleFunctions('src/lib/sports/providers.ts', ['normalizeBookName', 'normalizeProvider', 'canonicalizeProvider']);
 const game = { id: '1', espnLeague: 'mlb', source: 'mlb', dateKey: '2020-01-01', start: '2020-01-01T18:00:00Z', name: 'Philadelphia at Pittsburgh', shortName: 'PHI @ PIT', statusText: 'Final', gameNumber: 1, away: { abbr: 'PHI', name: 'Philadelphia', score: '5' }, home: { abbr: 'PIT', name: 'Pittsburgh', score: '2' } };
 
 test('cache serves bounded stale data on failure and never resets its original fetch time', async () => {
@@ -61,7 +62,7 @@ test('historical board fetches the requested date rather than filtering the pres
     const raw = JSON.stringify(body);
     return { ok: true, status: 200, json: async () => body, text: async () => raw };
   };
-  const server = moduleFunctions('src/lib/sports/server.ts', ['loadToday', 'parseEspnEvent'], { SportsCache, ...identity, ...time, ...teams, ...briefs, fetch });
+  const server = moduleFunctions('src/lib/sports/server.ts', ['loadToday', 'parseEspnEvent'], { SportsCache, ...identity, ...time, ...teams, ...briefs, ...providers, fetch });
   const board = await server.loadToday('2020-01-01');
   const dateParams = urls.map(u => new URL(u).searchParams.get('dates')).filter(Boolean);
   // One window (day-2..day+10), not a separate single-day + nearby pair.
@@ -79,7 +80,7 @@ test('loadToday does not double-fetch every league scoreboard', async () => {
     const raw = JSON.stringify(body);
     return { ok: true, status: 200, json: async () => body, text: async () => raw };
   };
-  const server = moduleFunctions('src/lib/sports/server.ts', ['loadToday'], { SportsCache, ...identity, ...time, ...teams, ...briefs, fetch });
+  const server = moduleFunctions('src/lib/sports/server.ts', ['loadToday'], { SportsCache, ...identity, ...time, ...teams, ...briefs, ...providers, fetch });
   await server.loadToday('2026-09-10');
   const scoreboardUrls = urls.filter(u => String(u).includes('/scoreboard'));
   // Five in-season leagues (NBA/NCAAB skipped in September) × one window.
@@ -96,7 +97,7 @@ test('college team hubs use espnId and survive schedule failure', async () => {
     if (String(url).includes('/teams/')) return { ok: true, json: async () => ({ team: { record: { items: [{ summary: '1-0' }] } } }) };
     return { ok: true, text: async () => '<feed></feed>', json: async () => ({}) };
   };
-  const server = moduleFunctions('src/lib/sports/server.ts', ['loadTeamPage', 'scheduleTeamId'], { SportsCache, ...identity, ...time, ...teams, ...briefs, fetch });
+  const server = moduleFunctions('src/lib/sports/server.ts', ['loadTeamPage', 'scheduleTeamId'], { SportsCache, ...identity, ...time, ...teams, ...briefs, ...providers, fetch });
   assert.equal(server.scheduleTeamId(teams.TEAM_BY_SLUG['penn-state']), '213');
   assert.equal(server.scheduleTeamId(teams.TEAM_BY_SLUG['temple']), '218');
   assert.equal(server.scheduleTeamId(teams.TEAM_BY_SLUG['eagles']), 'phi');
@@ -129,7 +130,7 @@ test('calendar export preserves UTC starts and escapes content instead of inject
 });
 
 test('CHI/DET ESPN ids do not stamp Flyers or Penguins as PA', () => {
-  const server = moduleFunctions('src/lib/sports/server.ts', ['parseEspnEvent', 'isPaEvent'], { SportsCache, ...identity, ...time, ...teams, ...briefs, fetch: async () => ({ ok: true, json: async () => ({}) }) });
+  const server = moduleFunctions('src/lib/sports/server.ts', ['parseEspnEvent', 'isPaEvent'], { SportsCache, ...identity, ...time, ...teams, ...briefs, ...providers, fetch: async () => ({ ok: true, json: async () => ({}) }) });
   const event = (home, away) => ({
     id: 'nhl-leak',
     date: '2026-09-26T23:00:00Z',
@@ -250,7 +251,7 @@ test('standings ignore CFB subcategory stat overwrites and sort by win percent',
     else if (u.includes('baseball/mlb') && u.includes('group=7')) body = { name: 'American League', children: [], season: mlbEast.season, seasons: mlbEast.seasons };
     return { ok: true, json: async () => body, status: 200 };
   };
-  const server = moduleFunctions('src/lib/sports/server.ts', ['loadStandings'], { SportsCache, ...identity, ...time, ...teams, ...briefs, fetch });
+  const server = moduleFunctions('src/lib/sports/server.ts', ['loadStandings'], { SportsCache, ...identity, ...time, ...teams, ...briefs, ...providers, fetch });
   const cfb = await server.loadStandings('cfb');
   const psu = cfb.groups.flatMap(g => g.rows).find(r => r.abbr === 'PSU');
   assert.equal(psu.wins, 1);
@@ -258,11 +259,13 @@ test('standings ignore CFB subcategory stat overwrites and sort by win percent',
   assert.equal(psu.streak, 'W1');
   assert.equal(psu.gamesBehind, '0.5');
   assert.deepEqual(cfb.groups[0].rows.map(r => r.abbr), ['PSU', 'IND']);
+  assert.equal(cfb.groups[0].name, 'Big Ten — Penn State');
 
   const mlb = await server.loadStandings('mlb');
   assert(urls.some(u => String(u).includes('group=8')));
   const east = mlb.groups.find(g => /East/i.test(g.name));
   assert(east, 'expected NL East group');
+  assert.equal(east.name, 'NL East');
   assert.deepEqual(east.rows.map(r => r.abbr), ['ATL', 'PHI', 'SF']);
   assert.equal(east.rows[1].slug, 'phillies');
 });
@@ -298,23 +301,53 @@ test('standings label NBA off-season finals from ESPN season types', async () =>
     if (u.includes('group=6')) body = { name: 'Western Conference', children: [], season: payload.season, seasons: payload.seasons };
     return { ok: true, status: 200, json: async () => body };
   };
-  const server = moduleFunctions('src/lib/sports/server.ts', ['loadStandings'], { SportsCache, ...identity, ...time, ...teams, ...briefs, fetch });
+  const server = moduleFunctions('src/lib/sports/server.ts', ['loadStandings'], { SportsCache, ...identity, ...time, ...teams, ...briefs, ...providers, fetch });
   const board = await server.loadStandings('nba');
   assert.match(board.seasonNote || '', /season is over|final standings/i);
   assert.equal(board.seasonLabel, '2025-26');
-  assert.equal(board.groups[0].name.includes('Atlantic'), true);
+  assert.equal(board.groups[0].name, 'Atlantic Division');
   assert.equal(board.groups[0].rows[0].slug, 'sixers');
 });
 
-test('Draft Kings provider labels normalize to DraftKings', () => {
+test('normalizeBookName canonicalizes sportsbook variants', () => {
+  const cases = [
+    ['Draft Kings', 'DraftKings'],
+    ['draftkings', 'DraftKings'],
+    ['DRAFTKINGS', 'DraftKings'],
+    ['DraftKings', 'DraftKings'],
+    ['draft kings', 'DraftKings'],
+    ['  Draft  Kings ', 'DraftKings'],
+    ['FanDuel', 'FanDuel'],
+    ['fan duel', 'FanDuel'],
+    ['FANDUEL', 'FanDuel'],
+    ['BetMGM', 'BetMGM'],
+    ['bet mgm', 'BetMGM'],
+    ['Bet MGM', 'BetMGM'],
+    ['Caesars', 'Caesars'],
+    ['caesars sportsbook', 'Caesars'],
+    ['PointsBet', 'PointsBet'],
+    ['points bet', 'PointsBet'],
+    ['PointBet', 'PointsBet'],
+    ['Bet365', 'Bet365'],
+    ['bet 365', 'Bet365'],
+    ['ESPN BET', 'ESPN BET'],
+    ['espn bet', 'ESPN BET'],
+    ['ESPN', 'ESPN'],
+    ['Some Local Book', 'Some Local Book'],
+  ];
+  for (const [input, want] of cases) {
+    assert.equal(providers.normalizeBookName(input), want, input);
+    assert.equal(providers.normalizeProvider(input), want, input);
+    assert.equal(providers.canonicalizeProvider(input), want, input);
+  }
+});
+
+test('ESPN odds parse routes provider names through normalizeBookName', () => {
   const server = moduleFunctions('src/lib/sports/server.ts', ['normalizeProvider', 'parseEspnEvent'], {
-    SportsCache, ...identity, ...time, ...teams, ...briefs,
+    SportsCache, ...identity, ...time, ...teams, ...briefs, ...providers,
     fetch: async () => ({ ok: true, json: async () => ({}) }),
   });
   assert.equal(server.normalizeProvider('Draft Kings'), 'DraftKings');
-  assert.equal(server.normalizeProvider('draftkings'), 'DraftKings');
-  assert.equal(server.normalizeProvider('DraftKings'), 'DraftKings');
-  assert.equal(server.normalizeProvider('ESPN BET'), 'ESPN BET');
 
   const fixture = {
     id: '401',
@@ -341,7 +374,7 @@ test('Draft Kings provider labels normalize to DraftKings', () => {
 
 test('ensureEspnHttps upgrades ESPN hosts only', () => {
   const server = moduleFunctions('src/lib/sports/server.ts', ['ensureEspnHttps'], {
-    SportsCache, ...identity, ...time, ...teams, ...briefs,
+    SportsCache, ...identity, ...time, ...teams, ...briefs, ...providers,
     fetch: async () => ({ ok: true, json: async () => ({}) }),
   });
   assert.equal(server.ensureEspnHttps('http://www.espn.com/story'), 'https://www.espn.com/story');
