@@ -219,10 +219,34 @@ function spreadLine(first: Record<string, unknown>): string | undefined {
   return n > 0 ? `+${magStr}` : `-${magStr}`;
 }
 
+
+/** Canonical sportsbook labels — ESPN sometimes returns a spaced "Draft Kings". */
+function normalizeProvider(name: string): string {
+  const trimmed = name.trim();
+  if (/^draft\s*kings$/i.test(trimmed)) return "DraftKings";
+  return trimmed;
+}
+
+/** Upgrade ESPN http links to https when the host is clearly ESPN. */
+function ensureEspnHttps(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:") return url;
+    if (!/(^|\.)espn\.com$/i.test(parsed.hostname) && !/(^|\.)espncdn\.com$/i.test(parsed.hostname)) {
+      return url;
+    }
+    parsed.protocol = "https:";
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 function oddsOf(comp: Record<string, unknown>): GameOdds | undefined {
   const first = rec(arr(comp.odds)[0]);
   if (!first) return undefined;
-  const provider = str(rec(first.provider)?.name) || "ESPN";
+  const provider = normalizeProvider(str(rec(first.provider)?.name) || "ESPN");
   const ml = rec(first.moneyline);
   const homeMl =
     american(rec(rec(ml?.home)?.close)?.odds) ||
@@ -269,7 +293,7 @@ function sideFrom(competitor: Record<string, unknown>, espnLeague: string): Game
   const id = str(team.id) || str(competitor.id);
   const abbr = competitorAbbr(team) || "TEAM";
   const name = str(team.displayName) || str(team.name) || abbr;
-  const logo = str(team.logo) || str(rec(arr(team.logos)[0])?.href) || espnLogo(espnLeague, abbr, id);
+  const logo = ensureEspnHttps(str(team.logo) || str(rec(arr(team.logos)[0])?.href)) || espnLogo(espnLeague, abbr, id);
   const slug = paSlugFor(espnLeague, id, abbr);
   const winner = competitor.winner === true;
   return { id, name, abbr, logo, score: scoreOf(competitor), winner, slug };
@@ -344,7 +368,7 @@ export function parseEspnEvent(event: unknown, espnLeague: string): Game | null 
   return {
     id: str(e.id) || `${espnLeague}-${start}-${away.abbr}-${home.abbr}`,
     gameNumber: Number(comp.gameNumber) || undefined,
-    sourceUrl: str(rec(arr(e.links)[0])?.href) || undefined,
+    sourceUrl: ensureEspnHttps(str(rec(arr(e.links)[0])?.href) || undefined),
     start,
     dateKey: dateKeyNY(start),
     name: str(e.name) || `${away.name} at ${home.name}`,
@@ -713,8 +737,8 @@ function parseArticle(raw: unknown, teamSlug?: string, league?: string): NewsIte
   if (!a) return null;
   const headline = str(a.headline) || str(a.title);
   if (!headline) return null;
-  const href = str(rec(rec(a.links)?.web)?.href) || str(rec(a.links)?.href);
-  const image = str(rec(arr(a.images)[0])?.url);
+  const href = ensureEspnHttps(str(rec(rec(a.links)?.web)?.href) || str(rec(a.links)?.href));
+  const image = ensureEspnHttps(str(rec(arr(a.images)[0])?.url));
   return {
     id: str(a.id) || headline,
     headline,
