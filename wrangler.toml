@@ -21,8 +21,9 @@ migrations_dir = "drizzle"
 [vars]
 KEYSTONE_ADMIN_EMAIL = "collindk94@gmail.com"
 KEYSTONE_AI_ENABLED = "true"
-# Beat Module M1 — fixture UI on /news. Default OFF in production.
+# Beat Module — D1 public strip on /news when ON. Default OFF until Collin verifies + flips.
 # Preview: set KEYSTONE_BEAT_M1 = "true" on the preview Worker / wrangler vars.
+# Public path never serves beat-poc.json fixtures.
 KEYSTONE_BEAT_M1 = "false"
 
 # Secrets (set with wrangler secret put, NOT in this file):

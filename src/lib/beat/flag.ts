@@ -1,13 +1,13 @@
 /**
- * Beat Module Milestone 1 feature flag.
+ * Beat Module feature flag (M1 name retained for continuity).
  *
  * Name: KEYSTONE_BEAT_M1
- * Values: "true" | "false" (anything other than "true" is OFF)
+ * Values: "true" | "false" (anything other than "true"/"1" is OFF)
  * Default: OFF in wrangler.toml [vars] for production safety.
  *
- * Preview: set KEYSTONE_BEAT_M1=true in the Cloudflare preview Worker vars
- * (or `wrangler secret` / dashboard vars for the preview environment),
- * or export KEYSTONE_BEAT_M1=true for local `npm run dev`.
+ * When ON: public /news loads approved+unexpired rows from D1 (never fixtures).
+ * Empty D1 → minimal empty Beat state. Preview: set KEYSTONE_BEAT_M1=true on the
+ * preview Worker / local env only — parent enables production after verify.
  */
 
 export const BEAT_M1_FLAG = "KEYSTONE_BEAT_M1" as const;

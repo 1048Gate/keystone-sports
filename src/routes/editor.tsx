@@ -75,7 +75,7 @@ function Editor() {
     <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 lg:grid-cols-[2fr_1fr]">
       <section>
         <h1 className="font-display text-4xl">Publisher dashboard</h1>
-        <p className="mt-2 text-sm"><a href="/editor/beat" className="text-accent hover:underline">Beat desk (M1 stub)</a></p>
+        <p className="mt-2 text-sm"><a href="/editor/beat" className="text-accent hover:underline">Beat desk</a></p>
         <p className="mt-3 text-muted">Draft privately, then publish notes, events, or reviewed recaps for everyone.</p>
         <form className="mt-6 space-y-4" onSubmit={(e) => { e.preventDefault(); void save(false); }}>
           <label className="block">

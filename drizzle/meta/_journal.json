@@ -15,6 +15,13 @@
       "when": 1788812434631,
       "tag": "0001_graceful_fantastic_four",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789063258214,
+      "tag": "0002_beat_items",
+      "breakpoints": true
     }
   ]
 }

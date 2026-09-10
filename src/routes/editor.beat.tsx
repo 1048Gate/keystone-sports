@@ -1,13 +1,26 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getSiteAccess } from "@/lib/publishing/api";
-import { getBeatAdminDesk } from "@/lib/beat/api";
-import { BEAT_CATEGORY_LABELS, SOURCE_TIER_LABELS, type BeatEditorAction, type BeatItem } from "@/lib/beat/types";
+import { getBeatAdminDesk, mutateBeatItem, createBeatItem, discoverBeatCandidates } from "@/lib/beat/api";
+import {
+  BEAT_CATEGORIES,
+  BEAT_CATEGORY_LABELS,
+  SOURCE_TIER_LABELS,
+  type BeatCategory,
+  type BeatItem,
+  type SourceTier,
+} from "@/lib/beat/types";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { TEAMS } from "@/data/teams";
 
 export const Route = createFileRoute("/editor/beat")({
   loader: async () => {
     const access = await getSiteAccess();
-    const desk = access.admin ? await getBeatAdminDesk() : { enabled: false, generatedAt: "", items: [], adminItems: [] as BeatItem[] };
+    const desk = access.admin
+      ? await getBeatAdminDesk()
+      : { enabled: false, generatedAt: "", items: [], adminItems: [] as BeatItem[], source: "empty" as const };
     return { access, desk };
   },
   staleTime: 0,
@@ -20,18 +33,32 @@ export const Route = createFileRoute("/editor/beat")({
   component: BeatEditorPage,
 });
 
-const ACTIONS: Array<{ id: BeatEditorAction; label: string }> = [
-  { id: "approve", label: "Approve" },
-  { id: "reject", label: "Reject" },
-  { id: "edit_context", label: "Edit context" },
-  { id: "change_category", label: "Change category" },
-  { id: "pin", label: "Pin" },
-  { id: "expire", label: "Expire" },
-  { id: "open_original", label: "Open original" },
-];
-
 function BeatEditorPage() {
   const { access, desk } = Route.useLoaderData();
+  const router = useRouter();
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [draft, setDraft] = useState({
+    originalUrl: "",
+    source: "",
+    authorAccount: "",
+    sourceTier: "reporter_original" as SourceTier,
+    teamSlug: "",
+    category: "from_the_beat" as BeatCategory,
+    headline: "",
+    context: "",
+    verifiedOfficial: false,
+    expiresAt: "",
+  });
+
+  const rows = desk.adminItems ?? [];
+  const visible = useMemo(() => {
+    if (filter === "all") return rows;
+    return rows.filter((r) => r.approvalStatus === filter);
+  }, [rows, filter]);
+  const preview = rows.find((r) => r.id === previewId) ?? visible[0] ?? null;
 
   if (!access.admin) {
     return (
@@ -56,61 +83,301 @@ function BeatEditorPage() {
     );
   }
 
-  const rows = desk.adminItems ?? [];
+  async function refresh(msg: string) {
+    setMessage(msg);
+    await router.invalidate();
+  }
+
+  async function run(action: () => Promise<unknown>, ok: string) {
+    setBusy(true);
+    setMessage("");
+    try {
+      await action();
+      await refresh(ok);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Action failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-8">
       <p className="text-sm text-muted">
         <Link to="/editor" className="hover:text-fg">
           ← Publisher
         </Link>
       </p>
-      <h1 className="mt-2 font-display text-4xl">Beat desk (M1 stub)</h1>
+      <h1 className="mt-2 font-display text-4xl">Beat desk</h1>
       <p className="mt-3 max-w-2xl text-muted">
-        Fixture inventory for Milestone 1. Controls below are documented placeholders — no live X scraping and no D1
-        writes yet. Public Beat strip flag: <code>KEYSTONE_BEAT_M1</code> ({desk.enabled ? "on" : "off"}).
+        D1-backed candidate queue. Approve is manual only — discovery never auto-publishes. Public strip flag:{" "}
+        <code>KEYSTONE_BEAT_M1</code> ({desk.enabled ? "on" : "off"}). Storage: {desk.source}.
       </p>
+      {message ? <p className="mt-3 text-sm text-accent">{message}</p> : null}
 
       <div className="mt-6 flex flex-wrap gap-2">
-        {ACTIONS.map((action) => (
-          <Button
-            key={action.id}
-            type="button"
-            variant="outline"
-            disabled={action.id !== "open_original"}
-            title={action.id === "open_original" ? "Use per-row link" : "Stubbed until M3 D1 CRUD"}
-          >
-            {action.label}
+        {(["pending", "approved", "rejected", "all"] as const).map((key) => (
+          <Button key={key} type="button" variant={filter === key ? "default" : "outline"} disabled={busy} onClick={() => setFilter(key)}>
+            {key} ({key === "all" ? rows.length : rows.filter((r) => r.approvalStatus === key).length})
           </Button>
         ))}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy}
+          onClick={() =>
+            void run(
+              () => discoverBeatCandidates({ data: { dryRun: false, perAccountLimit: 2 } }),
+              "Discovery finished — new rows are pending only.",
+            )
+          }
+        >
+          Run discovery (pending)
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy}
+          onClick={() =>
+            void run(async () => {
+              const result = await discoverBeatCandidates({ data: { dryRun: true, perAccountLimit: 2 } });
+              setMessage(`Dry-run: ${result.candidates.length} candidates, ${result.skippedDuplicates} dupes.`);
+            }, "")
+          }
+        >
+          Discovery dry-run
+        </Button>
       </div>
-      <p className="mt-2 text-xs text-subtle">Approve / Reject / Edit context / Change category / Pin / Expire ship with D1 in M3.</p>
 
-      <ul className="mt-8 space-y-4">
-        {rows.map((item) => (
-          <li key={item.id} className="rounded-md bg-surface p-4 shadow-[var(--shadow-border)]">
-            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted">
-              <span>{BEAT_CATEGORY_LABELS[item.category]}</span>
-              <span>·</span>
-              <span>{item.approvalStatus}</span>
-              <span>·</span>
-              <span>{item.mediaType}</span>
-              <span>·</span>
-              <span>{SOURCE_TIER_LABELS[item.sourceTier]}</span>
-              {item.pinned ? <span className="rounded-sm bg-accent px-1.5 py-0.5 text-accent-fg">Pinned</span> : null}
-            </div>
-            <p className="mt-2 font-display text-xl tracking-wide">{item.headline}</p>
-            {item.context ? <p className="mt-1 text-sm text-muted">{item.context}</p> : null}
-            <p className="mt-2 text-xs text-subtle">
-              {item.source} · {item.authorAccount}
-              {item.expiresAt ? ` · expires ${item.expiresAt}` : ""}
-            </p>
-            <a href={item.originalUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm font-semibold text-accent hover:underline">
-              Open original
-            </a>
-          </li>
-        ))}
-      </ul>
+      <div className="mt-8 grid gap-8 lg:grid-cols-[1.2fr_1fr]">
+        <section>
+          <h2 className="font-display text-2xl">Queue</h2>
+          {!visible.length ? (
+            <p className="mt-3 text-sm text-muted">No items in this filter. Seed with <code>npm run beat:seed</code> or add a URL below.</p>
+          ) : null}
+          <ul className="mt-4 space-y-4">
+            {visible.map((item) => (
+              <li key={item.id} className="rounded-md bg-surface p-4 shadow-[var(--shadow-border)]">
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted">
+                  <span>{BEAT_CATEGORY_LABELS[item.category]}</span>
+                  <span>·</span>
+                  <span>{item.approvalStatus}</span>
+                  <span>·</span>
+                  <span>{item.mediaType}</span>
+                  <span>·</span>
+                  <span>{SOURCE_TIER_LABELS[item.sourceTier]}</span>
+                  {item.pinned ? <span className="rounded-sm bg-accent px-1.5 py-0.5 text-accent-fg">Pinned</span> : null}
+                  {typeof item.relevanceScore === "number" ? <span>score {item.relevanceScore}</span> : null}
+                </div>
+                <p className="mt-2 font-display text-xl tracking-wide">{item.headline}</p>
+                {item.context ? <p className="mt-1 text-sm text-muted">{item.context}</p> : null}
+                <p className="mt-2 text-xs text-subtle">
+                  {item.source} · {item.authorAccount}
+                  {item.expiresAt ? ` · expires ${item.expiresAt}` : ""}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" disabled={busy || item.approvalStatus === "approved"} onClick={() => void run(() => mutateBeatItem({ data: { id: item.id, action: "approve", expiresAt: item.expiresAt ?? undefined } }), "Approved.")}>
+                    Approve
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void run(() => mutateBeatItem({ data: { id: item.id, action: "reject" } }), "Rejected.")}>
+                    Reject
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setPreviewId(item.id)}>
+                    Preview
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => {
+                      const next = window.prompt("Keystone context (1–3 sentences)", item.context ?? "");
+                      if (next == null) return;
+                      void run(() => mutateBeatItem({ data: { id: item.id, action: "edit_context", context: next } }), "Context updated.");
+                    }}
+                  >
+                    Edit context
+                  </Button>
+                  <label className="inline-flex items-center gap-1 text-xs">
+                    Category
+                    <select
+                      className="rounded border border-border bg-surface px-2 py-1"
+                      value={item.category}
+                      disabled={busy}
+                      onChange={(e) =>
+                        void run(
+                          () =>
+                            mutateBeatItem({
+                              data: { id: item.id, action: "change_category", category: e.target.value as BeatCategory },
+                            }),
+                          "Category updated.",
+                        )
+                      }
+                    >
+                      {BEAT_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {BEAT_CATEGORY_LABELS[c]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() =>
+                      void run(
+                        () => mutateBeatItem({ data: { id: item.id, action: item.pinned ? "unpin" : "pin" } }),
+                        item.pinned ? "Unpinned." : "Pinned.",
+                      )
+                    }
+                  >
+                    {item.pinned ? "Unpin" : "Pin"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => {
+                      const next = window.prompt("Expiration ISO (empty to clear)", item.expiresAt ?? "");
+                      if (next == null) return;
+                      void run(
+                        () =>
+                          mutateBeatItem({
+                            data: { id: item.id, action: "set_expiration", expiresAt: next.trim() ? next.trim() : null },
+                          }),
+                        "Expiration updated.",
+                      );
+                    }}
+                  >
+                    Set expiration
+                  </Button>
+                  <a href={item.originalUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-sm font-semibold text-accent hover:underline">
+                    Open original
+                  </a>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <aside className="space-y-8">
+          <section className="rounded-md bg-surface p-4 shadow-[var(--shadow-border)]">
+            <h2 className="font-display text-2xl">Preview</h2>
+            {preview ? (
+              <div className="mt-3 space-y-2 text-sm">
+                <p className="font-semibold uppercase tracking-wider text-muted">{BEAT_CATEGORY_LABELS[preview.category]}</p>
+                <p className="font-display text-xl">{preview.headline}</p>
+                <p className="text-muted">{preview.context}</p>
+                <p className="text-xs text-subtle">{preview.mediaType} · {preview.originalUrl}</p>
+                {preview.embedUrl ? <p className="text-xs break-all text-subtle">embed {preview.embedUrl}</p> : null}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-muted">Select Preview on a row.</p>
+            )}
+          </section>
+
+          <section className="rounded-md bg-surface p-4 shadow-[var(--shadow-border)]">
+            <h2 className="font-display text-2xl">Add URL</h2>
+            <p className="mt-1 text-xs text-muted">Creates a <strong>pending</strong> candidate. Approve separately.</p>
+            <form
+              className="mt-4 space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void run(
+                  () =>
+                    createBeatItem({
+                      data: {
+                        ...draft,
+                        teamSlug: draft.teamSlug || null,
+                        expiresAt: draft.expiresAt || null,
+                        approveNow: false,
+                      },
+                    }),
+                  "Candidate saved as pending.",
+                );
+              }}
+            >
+              <label className="block text-sm">
+                Original URL
+                <Input required value={draft.originalUrl} onChange={(e) => setDraft({ ...draft, originalUrl: e.target.value })} />
+              </label>
+              <label className="block text-sm">
+                Headline / Keystone caption
+                <Input required value={draft.headline} onChange={(e) => setDraft({ ...draft, headline: e.target.value })} />
+              </label>
+              <label className="block text-sm">
+                Context
+                <Textarea value={draft.context} onChange={(e) => setDraft({ ...draft, context: e.target.value })} rows={3} />
+              </label>
+              <label className="block text-sm">
+                Source
+                <Input required value={draft.source} onChange={(e) => setDraft({ ...draft, source: e.target.value })} />
+              </label>
+              <label className="block text-sm">
+                Account / byline
+                <Input required value={draft.authorAccount} onChange={(e) => setDraft({ ...draft, authorAccount: e.target.value })} />
+              </label>
+              <label className="block text-sm">
+                Tier
+                <select
+                  className="mt-1 block min-h-11 w-full rounded border border-border bg-surface px-3"
+                  value={draft.sourceTier}
+                  onChange={(e) => setDraft({ ...draft, sourceTier: e.target.value as SourceTier })}
+                >
+                  {(Object.keys(SOURCE_TIER_LABELS) as SourceTier[]).map((t) => (
+                    <option key={t} value={t}>
+                      {SOURCE_TIER_LABELS[t]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm">
+                Category
+                <select
+                  className="mt-1 block min-h-11 w-full rounded border border-border bg-surface px-3"
+                  value={draft.category}
+                  onChange={(e) => setDraft({ ...draft, category: e.target.value as BeatCategory })}
+                >
+                  {BEAT_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {BEAT_CATEGORY_LABELS[c]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm">
+                Team
+                <select
+                  className="mt-1 block min-h-11 w-full rounded border border-border bg-surface px-3"
+                  value={draft.teamSlug}
+                  onChange={(e) => setDraft({ ...draft, teamSlug: e.target.value })}
+                >
+                  <option value="">Site-wide</option>
+                  {TEAMS.map((t) => (
+                    <option key={t.slug} value={t.slug}>
+                      {t.shortName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm">
+                Expiration (ISO, required later for Breaking)
+                <Input value={draft.expiresAt} onChange={(e) => setDraft({ ...draft, expiresAt: e.target.value })} placeholder="2026-09-14T23:59:00.000Z" />
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={draft.verifiedOfficial} onChange={(e) => setDraft({ ...draft, verifiedOfficial: e.target.checked })} />
+                Verified / official
+              </label>
+              <Button type="submit" disabled={busy}>
+                Save pending candidate
+              </Button>
+            </form>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }

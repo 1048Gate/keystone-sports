@@ -21,7 +21,9 @@
     "format": "prettier --write .",
     "build:grok": "node scripts/with-app-env.mjs vite build && npm run db:migrate",
     "test:sports": "node --experimental-strip-types --test tests/*.test.mjs",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "beat:seed": "node scripts/beat-seed.mjs",
+    "beat:discover": "node scripts/beat-discover.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
