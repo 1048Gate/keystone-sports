@@ -3,24 +3,66 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { FollowButton } from "@/components/follow-button";
 import { GameCard } from "@/components/game-card";
 import { PendingScreen } from "@/components/pending-screen";
+import { RouteError } from "@/components/route-error";
 import { HIGHLIGHT_BY_SLUG } from "@/data/highlights";
 import { TEAM_BY_SLUG, teamLogo } from "@/data/teams";
 import { getTeamPage } from "@/lib/sports/api";
 import { getTeamPosts } from "@/lib/publishing/api";
 import type { Post } from "@/lib/publishing/types";
+import type { TeamPageData } from "@/lib/sports/types";
 import { dateKeyNY, formatKick, relativeWhen, untilWhen } from "@/lib/sports/time";
 import { cn } from "@/lib/utils";
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(label)), ms);
+    promise.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
 
 export const Route = createFileRoute("/teams/$slug")({
   loader: async ({ params }) => {
     const team = TEAM_BY_SLUG[params.slug];
     if (!team) throw notFound();
-    const page = await getTeamPage({ data: { slug: params.slug } });
-    const recaps = await getTeamPosts({ data: { slug: params.slug } }).catch(() => [] as Post[]);
-    return { team, page, recaps };
+    // Cap wait so Worker 1102 / hung upstream never leaves PendingScreen forever.
+    let page: TeamPageData | null = null;
+    let loadWarning: string | undefined;
+    try {
+      page = await withTimeout(
+        getTeamPage({ data: { slug: params.slug } }),
+        20_000,
+        "Team hub timed out while contacting feeds.",
+      );
+    } catch (e) {
+      loadWarning = e instanceof Error ? e.message : "Team feeds are temporarily unavailable.";
+      page = {
+        slug: params.slug,
+        generatedAt: new Date().toISOString(),
+        games: [],
+        articles: [],
+        buzz: [],
+        warnings: [loadWarning],
+      };
+    }
+    const recaps = await withTimeout(
+      getTeamPosts({ data: { slug: params.slug } }).catch(() => [] as Post[]),
+      8_000,
+      "recaps",
+    ).catch(() => [] as Post[]);
+    return { team, page, recaps, loadWarning };
   },
   staleTime: 20_000,
   pendingComponent: PendingScreen,
+  errorComponent: RouteError,
   head: ({ loaderData }) => ({
     meta: [
       {
@@ -34,8 +76,9 @@ export const Route = createFileRoute("/teams/$slug")({
 });
 
 function TeamPage() {
-  const { team, page, recaps } = Route.useLoaderData();
+  const { team, page, recaps, loadWarning } = Route.useLoaderData();
   const today = dateKeyNY();
+  const feedWarnings = [...(page?.warnings ?? []), ...(loadWarning ? [loadWarning] : [])];
   const games = uniqueGames(page?.games ?? []);
   const upcoming = games
     .filter((g) => g.status === "in" || (g.dateKey >= today && g.status !== "post"))
@@ -45,6 +88,11 @@ function TeamPage() {
 
   return (
     <>
+      {feedWarnings.length ? (
+        <div className="border-b border-border bg-elevated px-4 py-3 text-sm text-warn sm:px-6" role="status">
+          {feedWarnings[0]} Club identity and links below still work.
+        </div>
+      ) : null}
       <section className="border-b border-border bg-surface">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-5 px-4 py-8 sm:px-6">
           <img data-logo src={teamLogo(team)} alt="" className="h-16 w-16 object-contain sm:h-20 sm:w-20" />

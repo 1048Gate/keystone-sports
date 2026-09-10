@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PendingScreen } from "@/components/pending-screen";
+import { RouteError } from "@/components/route-error";
+
 import { TEAM_BY_SLUG } from "@/data/teams";
 import { getNewsWire } from "@/lib/sports/api";
 import { rankPaNews } from "@/lib/sports/filter";
@@ -10,6 +12,7 @@ export const Route = createFileRoute("/news")({
   loader: () => getNewsWire(),
   staleTime: 60_000,
   pendingComponent: PendingScreen,
+  errorComponent: RouteError,
   head: () => ({
     meta: [{ title: "News — Keystone" }],
   }),

@@ -9,6 +9,8 @@ import { ArrowRight, Copy, PenLine, RefreshCw } from "lucide-react";
 import { FilterChips } from "@/components/filter-chips";
 import { GameCard, GameRow } from "@/components/game-card";
 import { PendingScreen } from "@/components/pending-screen";
+import { RouteError } from "@/components/route-error";
+
 import { TeamRail } from "@/components/team-rail";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +41,7 @@ export const Route = createFileRoute("/")({
   },
   staleTime: 20_000,
   pendingComponent: PendingScreen,
+  errorComponent: RouteError,
   head: () => ({
     meta: [
       { title: "Scores — Keystone" },

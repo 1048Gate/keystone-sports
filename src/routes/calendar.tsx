@@ -8,6 +8,8 @@ import { FilterChips } from "@/components/filter-chips";
 import { GameCard } from "@/components/game-card";
 import { MonthGrid } from "@/components/month-grid";
 import { PendingScreen } from "@/components/pending-screen";
+import { RouteError } from "@/components/route-error";
+
 import { Button } from "@/components/ui/button";
 import { getMonthBoard } from "@/lib/sports/api";
 import { useDesk } from "@/lib/sports/desk-store";
@@ -29,6 +31,7 @@ export const Route = createFileRoute("/calendar")({
   loader: ({ deps }) => getMonthBoard({ data: { month: deps.month } }),
   staleTime: 30_000,
   pendingComponent: PendingScreen,
+  errorComponent: RouteError,
   head: () => ({
     meta: [{ title: "Calendar — Keystone" }],
   }),
