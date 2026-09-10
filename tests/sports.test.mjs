@@ -129,3 +129,133 @@ test('CHI/DET ESPN ids do not stamp Flyers or Penguins as PA', () => {
   assert.deepEqual(server.parseEspnEvent(abbrOnly, 'nhl').paSlugs, ['flyers']);
 });
 
+
+test('standings ignore CFB subcategory stat overwrites and sort by win percent', async () => {
+  const urls = [];
+  const cfbPayload = {
+    name: 'FBS',
+    season: { year: 2026, displayName: '2026', startDate: '2026-02-01T08:00Z', endDate: '2027-01-28T07:59Z' },
+    seasons: [{
+      year: 2026, displayName: '2026', startDate: '2026-02-01T08:00Z', endDate: '2027-01-28T07:59Z',
+      types: [
+        { abbreviation: 'pre', name: 'Preseason', startDate: '2026-02-01T08:00Z', endDate: '2026-08-22T06:59Z' },
+        { abbreviation: 'reg', name: 'Regular Season', startDate: '2026-08-22T07:00Z', endDate: '2026-12-13T07:59Z' },
+      ],
+    }],
+    children: [{
+      id: '5', name: 'Big Ten Conference',
+      standings: { entries: [{
+        team: { id: '194', abbreviation: 'PSU', displayName: 'Penn State Nittany Lions' },
+        stats: [
+          { name: 'gamesBehind', type: 'gamesbehind', displayValue: '0.5', value: 0.5 },
+          { name: 'streak', type: 'streak', displayValue: 'W1', value: 1 },
+          { name: 'wins', type: 'wins', displayValue: '1', value: 1 },
+          { name: 'overall', type: 'total', displayValue: '1-0', value: null },
+          { name: 'wins', type: 'awayrecord_wins', displayValue: '0', value: 0 },
+          { name: 'streak', type: 'awayrecord_streak', displayValue: '-', value: 0 },
+          { name: 'gamesBehind', type: 'awayrecord_gamesbehind', displayValue: '-', value: 0 },
+          { name: 'Away', type: 'awayrecord', displayValue: '0-0', value: null },
+        ],
+      }, {
+        team: { id: '84', abbreviation: 'IND', displayName: 'Indiana Hoosiers' },
+        stats: [
+          { name: 'wins', type: 'wins', displayValue: '0', value: 0 },
+          { name: 'overall', type: 'total', displayValue: '0-1', value: null },
+          { name: 'streak', type: 'streak', displayValue: 'L1', value: -1 },
+          { name: 'gamesBehind', type: 'gamesbehind', displayValue: '1.5', value: 1.5 },
+          { name: 'wins', type: 'awayrecord_wins', displayValue: '0', value: 0 },
+        ],
+      }] },
+    }],
+  };
+  const mlbEast = {
+    name: 'National League',
+    season: { year: 2026, displayName: '2026' },
+    seasons: [{ year: 2026, displayName: '2026', types: [
+      { abbreviation: 'reg', name: 'Regular Season', startDate: '2026-03-25T07:00Z', endDate: '2026-09-29T06:59Z' },
+    ]}],
+    children: [{
+      id: '4', name: 'National League East',
+      standings: { entries: [
+        { team: { id: '26', abbreviation: 'SF', displayName: 'San Francisco Giants' }, stats: [
+          { name: 'wins', type: 'wins', displayValue: '62' }, { name: 'losses', type: 'losses', displayValue: '85' },
+          { name: 'winPercent', type: 'winpercent', displayValue: '.422' }, { name: 'gamesBehind', type: 'gamesbehind', displayValue: '29' },
+          { name: 'streak', type: 'streak', displayValue: 'W3' },
+        ]},
+        { team: { id: '19', abbreviation: 'PHI', displayName: 'Philadelphia Phillies' }, stats: [
+          { name: 'wins', type: 'wins', displayValue: '82' }, { name: 'losses', type: 'losses', displayValue: '64' },
+          { name: 'winPercent', type: 'winpercent', displayValue: '.562' }, { name: 'gamesBehind', type: 'gamesbehind', displayValue: '8.5' },
+          { name: 'streak', type: 'streak', displayValue: 'W1' },
+        ]},
+        { team: { id: '15', abbreviation: 'ATL', displayName: 'Atlanta Braves' }, stats: [
+          { name: 'wins', type: 'wins', displayValue: '85' }, { name: 'losses', type: 'losses', displayValue: '61' },
+          { name: 'winPercent', type: 'winpercent', displayValue: '.582' }, { name: 'gamesBehind', type: 'gamesbehind', displayValue: '5.5' },
+          { name: 'streak', type: 'streak', displayValue: 'L3' },
+        ]},
+      ] },
+    }],
+  };
+  const fetch = async (url) => {
+    urls.push(url);
+    const u = String(url);
+    let body = { name: 'empty', children: [], standings: { entries: [] }, season: {}, seasons: [] };
+    if (u.includes('college-football')) body = cfbPayload;
+    else if (u.includes('baseball/mlb') && u.includes('group=8')) body = mlbEast;
+    else if (u.includes('baseball/mlb') && u.includes('group=7')) body = { name: 'American League', children: [], season: mlbEast.season, seasons: mlbEast.seasons };
+    return { ok: true, json: async () => body, status: 200 };
+  };
+  const server = moduleFunctions('src/lib/sports/server.ts', ['loadStandings'], { SportsCache, ...identity, ...time, ...teams, ...briefs, fetch });
+  const cfb = await server.loadStandings('cfb');
+  const psu = cfb.groups.flatMap(g => g.rows).find(r => r.abbr === 'PSU');
+  assert.equal(psu.wins, 1);
+  assert.equal(psu.losses, 0);
+  assert.equal(psu.streak, 'W1');
+  assert.equal(psu.gamesBehind, '0.5');
+  assert.deepEqual(cfb.groups[0].rows.map(r => r.abbr), ['PSU', 'IND']);
+
+  const mlb = await server.loadStandings('mlb');
+  assert(urls.some(u => String(u).includes('group=8')));
+  const east = mlb.groups.find(g => /East/i.test(g.name));
+  assert(east, 'expected NL East group');
+  assert.deepEqual(east.rows.map(r => r.abbr), ['ATL', 'PHI', 'SF']);
+  assert.equal(east.rows[1].slug, 'phillies');
+});
+
+test('standings label NBA off-season finals from ESPN season types', async () => {
+  const payload = {
+    name: 'Eastern Conference',
+    season: { year: 2027, displayName: '2026-27', startDate: '2026-09-30T07:00Z', endDate: '2027-06-26T06:59Z' },
+    seasons: [{
+      year: 2026, displayName: '2025-26', startDate: '2025-10-01T07:00Z', endDate: '2026-06-27T06:59Z',
+      types: [
+        { abbreviation: 'reg', name: 'Regular Season', startDate: '2025-10-21T07:00Z', endDate: '2026-04-13T06:59Z' },
+        { abbreviation: 'off', name: 'Off Season', startDate: '2026-06-27T07:00Z', endDate: '2026-09-30T06:59Z' },
+      ],
+    }],
+    children: [{
+      id: '1', name: 'Atlantic',
+      standings: { entries: [{
+        team: { id: '20', abbreviation: 'PHI', displayName: 'Philadelphia 76ers' },
+        stats: [
+          { name: 'wins', type: 'wins', displayValue: '45' },
+          { name: 'losses', type: 'losses', displayValue: '37' },
+          { name: 'winPercent', type: 'winpercent', displayValue: '.549' },
+          { name: 'gamesBehind', type: 'gamesbehind', displayValue: '11' },
+          { name: 'streak', type: 'streak', displayValue: 'L1' },
+        ],
+      }] },
+    }],
+  };
+  const fetch = async (url) => {
+    const u = String(url);
+    let body = payload;
+    if (u.includes('group=6')) body = { name: 'Western Conference', children: [], season: payload.season, seasons: payload.seasons };
+    return { ok: true, status: 200, json: async () => body };
+  };
+  const server = moduleFunctions('src/lib/sports/server.ts', ['loadStandings'], { SportsCache, ...identity, ...time, ...teams, ...briefs, fetch });
+  const board = await server.loadStandings('nba');
+  assert.match(board.seasonNote || '', /season is over|final standings/i);
+  assert.equal(board.seasonLabel, '2025-26');
+  assert.equal(board.groups[0].name.includes('Atlantic'), true);
+  assert.equal(board.groups[0].rows[0].slug, 'sixers');
+});
