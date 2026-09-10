@@ -119,25 +119,8 @@ export function DeskShell({ children }: { children: ReactNode }) {
               ))}
             </div>
           </div>
-          <div className="mt-8 flex flex-col gap-3 border-t border-border pt-6 text-xs text-subtle sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-              <p>Keystone · a small desk for a big state.</p>
-              <a
-                href="https://twohoundsrun.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-subtle hover:text-muted"
-              >
-                <img
-                  src="/brand/two-hounds-mark.png"
-                  alt=""
-                  width={28}
-                  height={28}
-                  className="h-7 w-7 rounded-full opacity-90"
-                />
-                <span>A Two Hounds Run site</span>
-              </a>
-            </div>
+          <div className="mt-8 flex flex-col gap-1 border-t border-border pt-6 text-xs text-subtle sm:flex-row sm:justify-between">
+            <p>Keystone · a small desk for a big state.</p>
             <p>Lines are for information only. 21+ · If you gamble, call 1-800-GAMBLER.</p>
           </div>
         </div>
@@ -147,7 +130,7 @@ export function DeskShell({ children }: { children: ReactNode }) {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Two Hounds Run"
-        className="pointer-events-auto fixed bottom-4 right-4 z-20 hidden h-11 w-11 rounded-full opacity-70 shadow-md transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:block"
+        className="pointer-events-auto fixed bottom-4 right-4 z-20 hidden h-11 w-11 rounded-full opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:block"
       >
         <img
           src="/brand/two-hounds-mark.png"
