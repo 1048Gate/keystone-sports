@@ -14,7 +14,7 @@ export const Route = createFileRoute('/editor')({
     return { access, posts: access.admin ? await getEditorPosts() : [] as Post[] };
   },
   staleTime: 0,
-  head: () => ({ meta: [{ title: 'Publisher — Keystone' }, { name: 'robots', content: 'noindex' }] }),
+  head: () => ({ meta: [{ title: 'Publisher — Keystone Beat' }, { name: 'robots', content: 'noindex' }] }),
   component: Editor,
 });
 

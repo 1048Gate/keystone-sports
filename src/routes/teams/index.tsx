@@ -5,7 +5,7 @@ import { useFollows } from "@/lib/sports/follow-store";
 
 export const Route = createFileRoute("/teams/")({
   head: () => ({
-    meta: [{ title: "Teams — Keystone" }],
+    meta: [{ title: "Teams — Keystone Beat" }],
   }),
   component: TeamsPage,
 });

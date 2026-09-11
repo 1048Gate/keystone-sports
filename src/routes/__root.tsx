@@ -4,7 +4,7 @@ import { DeskShell } from "@/components/desk-shell";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "Keystone";
+const APP_NAME = "Keystone Beat";
 
 export const Route = createRootRoute({
   head: () => ({

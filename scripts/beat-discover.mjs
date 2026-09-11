@@ -2,36 +2,34 @@
 /**
  * Manual Beat discovery (candidate-only). Does not auto-publish.
  *
- * Usage:
- *   npm run beat:discover           # dry-run JSON to stdout
- *   npm run beat:discover -- --write-pending-sql > /tmp/beat-pending.sql
+ * Preferred (operator bot / editorial JSON):
+ *   npm run beat:discover -- --input candidates.json
+ *   cat candidates.json | npm run beat:discover
+ *   npm run beat:discover -- --input candidates.json --write-pending-sql
  *
- * CI: safe as dry-run; network to syndication.twitter.com + publish.twitter.com.
- * Production inserts: prefer admin POST discoverBeatCandidates (Access-gated) or
- * review dry-run then insert via editor / seed path.
+ * Then POST pending rows via bot ingest:
+ *   POST /api/editor/beat/ingest  Authorization: Bearer $KEYSTONE_BEAT_INGEST_SECRET
+ *
+ * Native Grok/X discovery runs outside the Worker; supply results as JSON.
+ *
+ * Legacy (often 429s — not for production):
+ *   npm run beat:discover -- --legacy-syndication
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 import { stripTypeScriptTypes } from "node:module";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const writeSql = process.argv.includes("--write-pending-sql");
+const legacySyndication = process.argv.includes("--legacy-syndication");
+const inputIdx = process.argv.indexOf("--input");
+const inputPath = inputIdx >= 0 ? process.argv[inputIdx + 1] : null;
 
-function loadTs(path, exportNames) {
-  const code = stripTypeScriptTypes(readFileSync(join(root, path), "utf8"), { mode: "transform" })
-    .replace(/^import\s+[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, "")
-    .replace(/\bexport /g, "");
-  const mod = new Function(`${code}\nreturn { ${exportNames.join(",")} };`)();
-  return mod;
-}
-
-// Lightweight inline discovery without full TS graph: re-implement fetch loop using discovery helpers via dynamic import of compiled strip.
-async function main() {
-  const discoveryPath = join(root, "src/lib/beat/discovery.ts");
+function loadHelpers() {
   const allowPath = join(root, "src/lib/beat/allowlist.ts");
   const fpPath = join(root, "src/lib/beat/fingerprint.ts");
+  const discoveryPath = join(root, "src/lib/beat/discovery.ts");
 
   const allowCode = stripTypeScriptTypes(readFileSync(allowPath, "utf8"), { mode: "transform" })
     .replace(/^import\s+[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, "")
@@ -42,7 +40,12 @@ async function main() {
   const fpCode = stripTypeScriptTypes(readFileSync(fpPath, "utf8"), { mode: "transform" })
     .replace(/^import\s+[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, "")
     .replace(/\bexport /g, "");
-  const fp = new Function("allow", `${fpCode}\nreturn { beatDuplicateFingerprint };`)(allow);
+  const fp = new Function(
+    "normalizeBeatUrl",
+    "extractXStatusId",
+    "extractYouTubeId",
+    `${fpCode}\nreturn { beatDuplicateFingerprint };`,
+  )(allow.normalizeBeatUrl, allow.extractXStatusId, allow.extractYouTubeId);
 
   const discCode = stripTypeScriptTypes(readFileSync(discoveryPath, "utf8"), { mode: "transform" })
     .replace(/^import\s+type[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, "")
@@ -51,10 +54,44 @@ async function main() {
   const discovery = new Function(
     "beatDuplicateFingerprint",
     "classifyBeatMedia",
-    `${discCode}\nreturn { discoverPaBeatCandidates, PA_BEAT_DISCOVERY_ACCOUNTS, scoreDiscoveryCandidate };`,
+    `${discCode}\nreturn { discoverPaBeatCandidates, candidatesFromEditorialJson, PA_BEAT_DISCOVERY_ACCOUNTS, scoreDiscoveryCandidate, scoreBandForRelevance };`,
   )(fp.beatDuplicateFingerprint, allow.classifyBeatMedia);
 
-  const result = await discovery.discoverPaBeatCandidates({ perAccountLimit: 2 });
+  return discovery;
+}
+
+async function readJsonInput() {
+  if (inputPath) {
+    if (!existsSync(inputPath)) throw new Error(`Input file not found: ${inputPath}`);
+    return JSON.parse(readFileSync(inputPath, "utf8"));
+  }
+  // Stdin when piped (not a TTY)
+  if (!process.stdin.isTTY) {
+    const chunks = [];
+    for await (const chunk of process.stdin) chunks.push(chunk);
+    const text = Buffer.concat(chunks).toString("utf8").trim();
+    if (text) return JSON.parse(text);
+  }
+  return null;
+}
+
+async function main() {
+  const discovery = loadHelpers();
+  let result;
+
+  if (legacySyndication) {
+    result = await discovery.discoverPaBeatCandidates({ perAccountLimit: 2 });
+    result = { ...result, discarded: result.discarded ?? 0, mode: "legacy-syndication" };
+  } else {
+    const raw = await readJsonInput();
+    if (!raw) {
+      console.error(`[beat:discover] Provide --input <file.json>, pipe JSON on stdin, or pass --legacy-syndication.
+Native Grok/X discovery is run by the operator bot outside the Worker; POST results to /api/editor/beat/ingest.`);
+      process.exit(2);
+    }
+    result = { ...discovery.candidatesFromEditorialJson(raw), mode: "editorial-json" };
+  }
+
   if (!writeSql) {
     console.log(JSON.stringify({ generatedAt: new Date().toISOString(), ...result }, null, 2));
     return;
@@ -75,7 +112,9 @@ async function main() {
   NULL, NULL, 0, ${c.relevanceScore}, ${esc(c.duplicateFingerprint)}, ${esc(c.timestamp)}, ${esc(c.timestamp)}, 'discover:cli'
 );`);
   }
-  console.error(`[beat:discover] ${result.candidates.length} pending SQL statements; skipped ${result.skippedDuplicates}; errors ${result.errors.length}`);
+  console.error(
+    `[beat:discover] ${result.candidates.length} pending SQL; skipped ${result.skippedDuplicates}; discarded ${result.discarded ?? 0}; errors ${(result.errors || []).length}`,
+  );
 }
 
 main().catch((err) => {

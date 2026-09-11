@@ -23,7 +23,7 @@ export const Route = createFileRoute("/odds")({
   pendingComponent: PendingScreen,
   errorComponent: RouteError,
   head: () => ({
-    meta: [{ title: "Odds — Keystone" }],
+    meta: [{ title: "Odds — Keystone Beat" }],
   }),
   component: OddsPage,
 });

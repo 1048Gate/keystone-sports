@@ -19,7 +19,7 @@ export const Route = createFileRoute("/news")({
   pendingComponent: PendingScreen,
   errorComponent: RouteError,
   head: () => ({
-    meta: [{ title: "News — Keystone" }],
+    meta: [{ title: "News — Keystone Beat" }],
   }),
   component: NewsPage,
 });

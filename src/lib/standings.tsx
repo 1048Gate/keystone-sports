@@ -40,7 +40,7 @@ export const Route = createFileRoute("/standings")({
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => getStandings({ data: { league: deps.league } }),
   staleTime: 60_000,
-  head: () => ({ meta: [{ title: "Standings — Keystone" }] }),
+  head: () => ({ meta: [{ title: "Standings — Keystone Beat" }] }),
   component: StandingsPage,
 });
 

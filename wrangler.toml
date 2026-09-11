@@ -8,6 +8,14 @@ workers_dev = true
 pattern = "keystone.twohoundsrun.com"
 custom_domain = true
 
+[[routes]]
+pattern = "keystonebeat.com"
+custom_domain = true
+
+[[routes]]
+pattern = "www.keystonebeat.com"
+custom_domain = true
+
 [assets]
 directory = "dist/client"
 
@@ -32,6 +40,10 @@ KEYSTONE_BEAT_M1 = "true"
 #   KEYSTONE_AUTO_RECAP_SECRET                  -> wrangler secret put KEYSTONE_AUTO_RECAP_SECRET
 #   Manual trigger (header only, never ?secret=):
 #     curl -H "Authorization: Bearer $SECRET" https://keystone.twohoundsrun.com/api/auto-recap
+#   KEYSTONE_BEAT_INGEST_SECRET                 -> wrangler secret put KEYSTONE_BEAT_INGEST_SECRET
+#   Bot pending ingest (header only, never ?secret=):
+#     curl -H "Authorization: Bearer $SECRET" -H "Content-Type: application/json" \
+#       -d '{"candidates":[...]}' https://keystonebeat.com/api/editor/beat/ingest
 #   KEYSTONE_ADMIN_EMAIL  (set as a var, below) -> wrangler secret put KEYSTONE_ADMIN_EMAIL if moved to a secret
 
 [triggers]

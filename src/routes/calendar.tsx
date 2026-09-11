@@ -33,7 +33,7 @@ export const Route = createFileRoute("/calendar")({
   pendingComponent: PendingScreen,
   errorComponent: RouteError,
   head: () => ({
-    meta: [{ title: "Calendar — Keystone" }],
+    meta: [{ title: "Calendar — Keystone Beat" }],
   }),
   component: CalendarPage,
 });
