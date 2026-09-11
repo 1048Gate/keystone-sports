@@ -1,0 +1,23 @@
+name = "keystone-beat-jobs"
+main = "src/index.ts"
+compatibility_date = "2026-09-07"
+account_id = "9f99f068882ff62fff142655f4c9f0cc"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "keystone-sports"
+database_id = "9d1f8f05-10d5-4a1c-87d5-fe038a328540"
+
+# Production default: expire-only. Apify discovery crons stay off until KEYSTONE_APIFY_ENABLED=true
+# and a paid Apify plan + APIFY_TOKEN are intentionally configured.
+[triggers]
+crons = ["15 * * * *"]
+
+[vars]
+KEYSTONE_APIFY_ENABLED = "false"
+
+# Secrets (wrangler secret put — never commit values):
+#   KEYSTONE_JOBS_SECRET
+#   KEYSTONE_BEAT_INGEST_SECRET  (optional; preferred write path via HTTP ingest)
+#   APIFY_TOKEN  (only when re-enabling Apify; do not set while disabled)
