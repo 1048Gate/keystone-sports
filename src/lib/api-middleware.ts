@@ -38,15 +38,15 @@ function checkIngestSecret(provided: string): string | null {
   return null;
 }
 
-/** www → apex for Keystone Beat. Preserve path + query. Do not touch keystone.twohoundsrun.com. */
-function wwwApexRedirect(request: Request): Response | null {
+/** Canonical host redirects → https://keystonebeat.com (preserve path + query). */
+function canonicalHostRedirect(request: Request): Response | null {
   const url = new URL(request.url);
   const host = (request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? url.host)
     .split(',')[0]
     .trim()
     .split(':')[0]
     .toLowerCase();
-  if (host !== 'www.keystonebeat.com') return null;
+  if (host !== 'www.keystonebeat.com' && host !== 'keystone.twohoundsrun.com') return null;
   const target = new URL(request.url);
   target.protocol = 'https:';
   target.host = 'keystonebeat.com';
@@ -56,7 +56,7 @@ function wwwApexRedirect(request: Request): Response | null {
 export const apiMiddleware = createMiddleware({ type: 'request' }).server(async ({ request, next }) => {
   if (!request) return next({});
 
-  const apex = wwwApexRedirect(request);
+  const apex = canonicalHostRedirect(request);
   if (apex) return apex;
 
   const url = new URL(request.url);
