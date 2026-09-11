@@ -47,6 +47,22 @@ export async function runExpireJob(env: Env): Promise<JobRunStats> {
 
 export async function runXDiscoveryJob(env: Env): Promise<DiscoveryReport> {
   const startedAt = new Date().toISOString();
+  if ((env.KEYSTONE_APIFY_ENABLED || "").trim().toLowerCase() !== "true") {
+    const stats: DiscoveryReport = {
+      jobType: "x-discovery",
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      retrieved: 0,
+      discarded: 0,
+      deduped: 0,
+      pendingWritten: 0,
+      error: "Apify disabled (KEYSTONE_APIFY_ENABLED!=true); no API call",
+      topCandidates: [],
+      teams: {},
+    };
+    await recordJobRun(env, stats).catch(() => undefined);
+    return stats;
+  }
   const token = (env.APIFY_TOKEN || "").trim();
   if (!token) {
     const stats: DiscoveryReport = {

@@ -18,6 +18,8 @@ export type BeatMediaType = "x_embed" | "youtube_embed" | "link_out";
 export type Env = {
   DB: D1Database;
   APIFY_TOKEN?: string;
+  /** "true" to allow Apify X discovery (default off — no paid plan yet). */
+  KEYSTONE_APIFY_ENABLED?: string;
   KEYSTONE_JOBS_SECRET?: string;
   KEYSTONE_BEAT_INGEST_SECRET?: string;
 };

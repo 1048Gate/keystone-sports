@@ -9,10 +9,15 @@ binding = "DB"
 database_name = "keystone-sports"
 database_id = "9d1f8f05-10d5-4a1c-87d5-fe038a328540"
 
+# Production default: expire-only. Apify discovery crons stay off until KEYSTONE_APIFY_ENABLED=true
+# and a paid Apify plan + APIFY_TOKEN are intentionally configured.
 [triggers]
-crons = ["0 11 * * *", "0 18 * * *", "0 23 * * *", "15 * * * *"]
+crons = ["15 * * * *"]
+
+[vars]
+KEYSTONE_APIFY_ENABLED = "false"
 
 # Secrets (wrangler secret put — never commit values):
-#   APIFY_TOKEN
 #   KEYSTONE_JOBS_SECRET
 #   KEYSTONE_BEAT_INGEST_SECRET  (optional; preferred write path via HTTP ingest)
+#   APIFY_TOKEN  (only when re-enabling Apify; do not set while disabled)

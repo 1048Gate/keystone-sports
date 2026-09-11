@@ -1,5 +1,8 @@
 # keystone-beat-jobs
 
+**Production default: Apify OFF.** Cron is expire-only (`15 * * * *`). Re-enable with `KEYSTONE_APIFY_ENABLED=true` + paid plan + `APIFY_TOKEN`.
+
+
 Separate Cloudflare Worker for **Keystone Beat** scheduled jobs:
 
 1. Apify X discovery (actor `nfp1fpt5gUlBwPcor`)
