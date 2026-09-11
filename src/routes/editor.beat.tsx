@@ -26,7 +26,7 @@ export const Route = createFileRoute("/editor/beat")({
   staleTime: 0,
   head: () => ({
     meta: [
-      { title: "Beat desk — Keystone" },
+      { title: "Beat desk — Keystone Beat" },
       { name: "robots", content: "noindex" },
     ],
   }),

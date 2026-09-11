@@ -67,8 +67,8 @@ export const Route = createFileRoute("/teams/$slug")({
     meta: [
       {
         title: loaderData?.team
-          ? `${loaderData.team.name} — Keystone`
-          : "Team — Keystone",
+          ? `${loaderData.team.name} — Keystone Beat`
+          : "Team — Keystone Beat",
       },
     ],
   }),

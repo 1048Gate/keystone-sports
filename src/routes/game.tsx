@@ -6,7 +6,7 @@ export const Route = createFileRoute('/game')({
   validateSearch: (s: Record<string, unknown>) => ({ date: typeof s.date === 'string' ? s.date : '', id: typeof s.id === 'string' ? s.id : '' }),
   loaderDeps: ({ search }) => search,
   loader: ({ deps }) => getGameDetail({ data: deps }),
-  head: () => ({ meta: [{ title: 'Game details — Keystone' }] }),
+  head: () => ({ meta: [{ title: 'Game details — Keystone Beat' }] }),
   component: GamePage,
 });
 function GamePage() {

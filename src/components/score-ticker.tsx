@@ -127,7 +127,7 @@ export function ScoreTicker() {
   if (!ready) {
     return (
       <div className="flex h-12 items-center bg-scoreboard px-4">
-        <p className="text-xs font-semibold uppercase tracking-widest text-scoreboard-fg/50">Keystone · PA</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-scoreboard-fg/50">Keystone Beat · PA</p>
       </div>
     );
   }

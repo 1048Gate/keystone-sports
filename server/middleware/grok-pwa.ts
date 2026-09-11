@@ -60,10 +60,28 @@ function injectHeadStreaming(response: Response, host: string): Response {
   });
 }
 
+
+/** www → apex for Keystone Beat custom domain. Keep path + query. Do not redirect keystone.twohoundsrun.com. */
+function wwwApexRedirect(event: GrokPwaEvent): Response | null {
+  const host = requestHost(event)
+    .split(",")[0]
+    .trim()
+    .split(":")[0]
+    .toLowerCase();
+  if (host !== "www.keystonebeat.com") return null;
+  const target = new URL(event.url);
+  target.protocol = "https:";
+  target.host = "keystonebeat.com";
+  return Response.redirect(target.toString(), 301);
+}
+
 export default async function grokPwaMiddleware(
   event: GrokPwaEvent,
   next: () => unknown | Promise<unknown>,
 ): Promise<unknown> {
+  const apex = wwwApexRedirect(event);
+  if (apex) return apex;
+
   const method = (event.req.method ?? "GET").toUpperCase();
   if (method !== "GET") return next();
 

@@ -44,7 +44,7 @@ export const Route = createFileRoute("/")({
   errorComponent: RouteError,
   head: () => ({
     meta: [
-      { title: "Scores — Keystone" },
+      { title: "Scores — Keystone Beat" },
       {
         name: "description",
         content:
@@ -282,7 +282,7 @@ function TodayPage() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name: "Keystone",
+    name: "Keystone Beat",
     description: "Pennsylvania sports scores, calendars, and news.",
     about: games.slice(0, 8).map((g) => ({
       "@type": "SportsEvent",

@@ -34,6 +34,9 @@ const discovery = load(
     'extractStatusIdsFromSyndicationHtml',
     'proposeExpiration',
     'PA_BEAT_DISCOVERY_ACCOUNTS',
+    'scoreBandForRelevance',
+    'shouldDiscardByScore',
+    'candidatesFromEditorialJson',
   ],
   {
     beatDuplicateFingerprint: fp.beatDuplicateFingerprint,
@@ -117,9 +120,12 @@ test('migration 0002 creates beat_items', () => {
   assert.match(sql, /beat_items_pub/);
 });
 
-test('production wrangler keeps KEYSTONE_BEAT_M1 false', () => {
+test('production wrangler documents Beat flag + keystonebeat routes + ingest secret', () => {
   const toml = readFileSync('wrangler.toml', 'utf8');
-  assert.match(toml, /KEYSTONE_BEAT_M1\s*=\s*"false"/);
+  assert.match(toml, /KEYSTONE_BEAT_M1\s*=/);
+  assert.match(toml, /keystonebeat\.com/);
+  assert.match(toml, /www\.keystonebeat\.com/);
+  assert.match(toml, /KEYSTONE_BEAT_INGEST_SECRET/);
 });
 
 test('getBeatDesk source file never imports fixtures', () => {
@@ -127,4 +133,58 @@ test('getBeatDesk source file never imports fixtures', () => {
   assert.equal(/from\s+["']\.\/fixtures["']/.test(api), false);
   assert.equal(/BEAT_POC_FIXTURES/.test(api), false);
   assert.match(api, /listPublicBeatRows/);
+});
+
+test('editorial score bands and discard threshold', () => {
+  assert.equal(discovery.scoreBandForRelevance(95), 'breaking');
+  assert.equal(discovery.scoreBandForRelevance(80), 'injuries_trades');
+  assert.equal(discovery.scoreBandForRelevance(60), 'strong_reporting');
+  assert.equal(discovery.scoreBandForRelevance(40), 'interviews_highlights');
+  assert.equal(discovery.scoreBandForRelevance(25), 'locker_room');
+  assert.equal(discovery.scoreBandForRelevance(10), 'discard');
+  assert.equal(discovery.shouldDiscardByScore(19), true);
+  assert.equal(discovery.shouldDiscardByScore(20), false);
+});
+
+test('candidatesFromEditorialJson scores, dedupes, discards low relevance', () => {
+  const { candidates, skippedDuplicates, discarded } = discovery.candidatesFromEditorialJson({
+    candidates: [
+      {
+        originalUrl: 'https://www.inquirer.com/eagles/example-story',
+        headline: 'Eagles injury report: starter limited',
+        source: 'Inquirer',
+        sourceTier: 'reporter_original',
+        teamSlug: 'eagles',
+        category: 'breaking',
+        relevanceScore: 88,
+      },
+      {
+        originalUrl: 'https://www.inquirer.com/eagles/example-story',
+        headline: 'duplicate url',
+        relevanceScore: 90,
+      },
+      {
+        originalUrl: 'https://example.com/noise',
+        headline: 'offtopic meme',
+        relevanceScore: 5,
+      },
+    ],
+  });
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].relevanceScore, 88);
+  assert.equal(candidates[0].categoryRecommendation, 'breaking');
+  assert.ok(candidates[0].duplicateFingerprint);
+  assert.equal(skippedDuplicates, 1);
+  assert.equal(discarded, 1);
+});
+
+test('www apex redirect helpers present in middleware', () => {
+  const nitro = readFileSync('server/middleware/grok-pwa.ts', 'utf8');
+  assert.match(nitro, /www\.keystonebeat\.com/);
+  assert.match(nitro, /keystonebeat\.com/);
+  assert.match(nitro, /301/);
+  const api = readFileSync('src/lib/api-middleware.ts', 'utf8');
+  assert.match(api, /\/api\/editor\/beat\/ingest/);
+  assert.match(api, /KEYSTONE_BEAT_INGEST_SECRET/);
+  assert.match(api, /www\.keystonebeat\.com/);
 });

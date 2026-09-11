@@ -29,7 +29,7 @@ function RecapHero({ post }: { post: Post }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <article className="rounded-md border border-accent/40 bg-surface p-5 shadow-[var(--shadow-border)] sm:p-6">
-      <p className="text-xs font-semibold uppercase tracking-widest text-accent">From Keystone</p>
+      <p className="text-xs font-semibold uppercase tracking-widest text-accent">From Keystone Beat</p>
       <p className="mt-2 text-sm text-muted">
         {post.date}
         {post.eventTime ? ` · ${post.eventTime} ET` : ""} · {post.kind}
@@ -76,11 +76,11 @@ export function PublishedUpdates({ date }: { date?: string }) {
   const [hero, ...rest] = sorted;
 
   return (
-    <section className="my-6 space-y-4" aria-label="Keystone updates">
+    <section className="my-6 space-y-4" aria-label="Keystone Beat updates">
       <RecapHero post={hero} />
       {rest.length ? (
         <div className="space-y-3">
-          <h2 className="font-display text-xl text-muted">More from Keystone</h2>
+          <h2 className="font-display text-xl text-muted">More from Keystone Beat</h2>
           {rest.map((p) => {
             const expanded = Boolean(expandedIds[p.id]);
             return (

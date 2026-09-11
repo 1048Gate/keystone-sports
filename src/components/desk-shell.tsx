@@ -57,7 +57,7 @@ export function DeskShell({ children }: { children: ReactNode }) {
           <Link to="/" className="flex h-11 shrink-0 items-center gap-2.5">
             <KeystoneMark className="h-9 w-9" />
             <span className="leading-none">
-              <span className="block font-display text-2xl font-semibold tracking-widest">KEYSTONE</span>
+              <span className="block font-display text-xl font-semibold tracking-widest sm:text-2xl">KEYSTONE BEAT</span>
               <span className="block text-xs font-semibold uppercase tracking-widest text-accent">
                 Pennsylvania Sports
               </span>
@@ -99,7 +99,8 @@ export function DeskShell({ children }: { children: ReactNode }) {
         <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
           <div className="flex flex-col gap-8 lg:flex-row lg:justify-between">
             <div>
-              <p className="font-display text-2xl tracking-widest">KEYSTONE</p>
+              <p className="font-display text-2xl tracking-widest">KEYSTONE BEAT</p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-widest text-accent">Pennsylvania Sports</p>
               <p className="mt-1 max-w-sm text-sm text-muted">
                 A small Pennsylvania desk — Philly, Pittsburgh, and the colleges. Scores, lines, and the beat, written
                 like the sports page, not a dashboard.
@@ -123,7 +124,7 @@ export function DeskShell({ children }: { children: ReactNode }) {
           </div>
           <div className="mt-8 flex flex-col gap-3 border-t border-border pt-6 text-xs text-subtle sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-              <p>Keystone · a small desk for a big state.</p>
+              <p>Keystone Beat · a small desk for a big state.</p>
               <a
                 href="https://twohoundsrun.com"
                 target="_blank"

@@ -1,6 +1,6 @@
-# Keystone outside Grok
+# Keystone Beat outside Grok
 
-The default build runs Keystone as a Cloudflare module Worker on Sites. It does not require the Grok preview host or a Grok subscription. The original Grok configuration is retained as `npm run build:grok`.
+The default build runs Keystone Beat as a Cloudflare module Worker on Sites. It does not require the Grok preview host or a Grok subscription. The original Grok configuration is retained as `npm run build:grok`.
 
 ## Using the site
 

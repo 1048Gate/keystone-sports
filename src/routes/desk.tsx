@@ -8,7 +8,7 @@ import { exportDesk, useDesk } from "@/lib/sports/desk-store";
 
 export const Route = createFileRoute("/desk")({
   head: () => ({
-    meta: [{ title: "My Notes — Keystone" }],
+    meta: [{ title: "My Notes — Keystone Beat" }],
   }),
   component: DeskPage,
 });
