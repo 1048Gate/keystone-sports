@@ -89,3 +89,12 @@ curl -sS -X POST https://keystone-beat-jobs.<account>.workers.dev/run/x-discover
 ```
 
 Verify PENDING rows in D1 — **do not approve** from this Worker.
+
+
+## Apify actor (apidojo/twitter-scraper-lite)
+
+- Store: `apidojo/twitter-scraper-lite` (id `nfp1fpt5gUlBwPcor`)
+- Input: `searchTerms` (≤5), `sort: Latest`, `maxItems`, `tweetLanguage: en`
+- Paid-plan pricing: **$0.016/query** + first ~40 tweets included; extra items **$0.0004** (≤5 queries)
+- Typical 5-query pass within included pages ≈ **~$0.08**; ~90 passes/month ≈ **~$7**
+- Free Apify plan is demo-only (5 runs/month, 10 items) — paid plan required for production cadence

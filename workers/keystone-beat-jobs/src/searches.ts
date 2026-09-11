@@ -20,35 +20,35 @@ export const PA_SPORTS_SEARCHES: SearchBucket[] = [
     teamSlug: "eagles",
     league: "NFL",
     query:
-      '(from:Eagles OR from:Jeff_McLane OR from:DZangaroNBCS OR from:Tim_McManus OR from:EliotShorr OR ("Eagles" (injury OR IR OR signed OR traded OR "ruled out" OR activated))) -is:retweet lang:en',
+      '(from:Eagles OR from:Jeff_McLane OR from:DZangaroNBCS OR from:Tim_McManus OR from:EliotShorr OR ("Eagles" (injury OR IR OR signed OR traded OR "ruled out" OR activated))) -filter:retweets lang:en',
   },
   {
     label: "steelers_official_reporters",
     teamSlug: "steelers",
     league: "NFL",
     query:
-      '(from:steelers OR from:MarkKaboly OR from:DaleLolley OR ("Steelers" (injury OR IR OR signed OR traded OR "ruled out" OR activated))) -is:retweet lang:en',
+      '(from:steelers OR from:MarkKaboly OR from:DaleLolley OR ("Steelers" (injury OR IR OR signed OR traded OR "ruled out" OR activated))) -filter:retweets lang:en',
   },
   {
     label: "phillies_pirates",
     teamSlug: "phillies",
     league: "MLB",
     query:
-      '(from:Phillies OR from:Pirates OR from:M_Gelb OR ("Phillies" OR "Pirates") (injury OR IL OR signed OR traded OR DFA OR activated)) -is:retweet lang:en',
+      '(from:Phillies OR from:Pirates OR from:M_Gelb OR ("Phillies" OR "Pirates") (injury OR IL OR signed OR traded OR DFA OR activated)) -filter:retweets lang:en',
   },
   {
     label: "sixers_flyers_penguins",
     teamSlug: "sixers",
     league: "NBA",
     query:
-      '(from:sixers OR from:NHLFlyers OR from:penguins OR (("Sixers" OR "76ers" OR Flyers OR Penguins) (injury OR traded OR signed OR "ruled out"))) -is:retweet lang:en',
+      '(from:sixers OR from:NHLFlyers OR from:penguins OR (("Sixers" OR "76ers" OR Flyers OR Penguins) (injury OR traded OR signed OR "ruled out"))) -filter:retweets lang:en',
   },
   {
     label: "penn_state_pitt_union",
     teamSlug: "penn-state",
     league: "NCAAF",
     query:
-      '(from:PennStateFball OR from:Pitt_FB OR from:PhilaUnion OR (("Penn State" OR "Nittany Lions" OR Pitt) (injury OR transfer OR signed OR starting))) -is:retweet lang:en',
+      '(from:PennStateFball OR from:Pitt_FB OR from:PhilaUnion OR (("Penn State" OR "Nittany Lions" OR Pitt) (injury OR transfer OR signed OR starting))) -filter:retweets lang:en',
   },
 ];
 

@@ -22,22 +22,33 @@ function authHeaders(token: string): HeadersInit {
   };
 }
 
-/** Build actor input — tolerate common field names across tweet scrapers. */
+/**
+ * Actor input for apidojo/twitter-scraper-lite (id nfp1fpt5gUlBwPcor).
+ * Keep ≤5 searchTerms for cheapest per-item tier ($0.0004).
+ * Query cost: $0.016 each; first ~40 tweets/query included.
+ */
 export function buildActorInput(opts?: {
   searchTerms?: string[];
   maxItems?: number;
 }): Record<string, unknown> {
-  const searchTerms = opts?.searchTerms ?? searchTermsForApify();
+  const searchTerms = (opts?.searchTerms ?? searchTermsForApify()).slice(0, 5);
   const maxItems = opts?.maxItems ?? DEFAULT_MAX_ITEMS;
   return {
     searchTerms,
-    searchTerm: searchTerms,
-    queries: searchTerms,
+    sort: "Latest",
     maxItems,
-    maxTweets: maxItems,
-    maxRequestRetries: 2,
-    addUserInfo: true,
+    tweetLanguage: "en",
   };
+}
+
+/** Estimate USD from Apify pay-per-event pricing (paid plan). */
+export function estimateApifyCostUsd(queryCount: number, itemCount: number): number {
+  const q = Math.max(0, queryCount);
+  const included = q * 40;
+  const extra = Math.max(0, itemCount - included);
+  // Tier 1 (≤5 queries): $0.0004/item beyond included pages
+  const perItem = q <= 5 ? 0.0004 : q <= 10 ? 0.0008 : 0.0012;
+  return Number((q * 0.016 + extra * perItem).toFixed(4));
 }
 
 export async function startActorRun(
@@ -101,9 +112,9 @@ export async function fetchDatasetItems(
   return Array.isArray(items) ? items : [];
 }
 
-/** ~$0.40 / 1000 tweets for similar scrapers. */
+/** @deprecated use estimateApifyCostUsd */
 export function estimateCostUsd(retrieved: number): number {
-  return Math.round((retrieved / 1000) * 0.4 * 10_000) / 10_000;
+  return estimateApifyCostUsd(5, retrieved);
 }
 
 /**
@@ -114,6 +125,7 @@ export async function runXDiscovery(
   opts?: { maxItems?: number; searchTerms?: string[] },
 ): Promise<ApifyRunResult> {
   const input = buildActorInput(opts);
+  const queryCount = Array.isArray(input.searchTerms) ? (input.searchTerms as string[]).length : 5;
   const { runId, datasetId: earlyDs } = await startActorRun(token, input);
   const { status, datasetId } = await pollRun(token, runId, { timeoutMs: 180_000 });
   if (status !== "SUCCEEDED") {
@@ -126,7 +138,7 @@ export async function runXDiscovery(
     datasetId: ds,
     items,
     status,
-    approxCostUsd: estimateCostUsd(items.length),
+    approxCostUsd: estimateApifyCostUsd(queryCount, items.length),
   };
 }
 
