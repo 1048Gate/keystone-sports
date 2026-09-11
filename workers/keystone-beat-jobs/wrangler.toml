@@ -1,0 +1,18 @@
+name = "keystone-beat-jobs"
+main = "src/index.ts"
+compatibility_date = "2026-09-07"
+account_id = "9f99f068882ff62fff142655f4c9f0cc"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "keystone-sports"
+database_id = "9d1f8f05-10d5-4a1c-87d5-fe038a328540"
+
+[triggers]
+crons = ["0 11 * * *", "0 18 * * *", "0 23 * * *", "15 * * * *"]
+
+# Secrets (wrangler secret put — never commit values):
+#   APIFY_TOKEN
+#   KEYSTONE_JOBS_SECRET
+#   KEYSTONE_BEAT_INGEST_SECRET  (optional; preferred write path via HTTP ingest)
