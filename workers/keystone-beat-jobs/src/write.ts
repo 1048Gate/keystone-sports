@@ -2,8 +2,23 @@ import type { BeatCandidate, Env } from "./types.ts";
 
 const INGEST_URL = "https://keystonebeat.com/api/editor/beat/ingest";
 
+/** Default HTTP ingest timeout (ms). Bounded between 3s and 30s. */
+const DEFAULT_INGEST_TIMEOUT_MS = 10_000;
+const MIN_INGEST_TIMEOUT_MS = 3_000;
+const MAX_INGEST_TIMEOUT_MS = 30_000;
+
+/**
+ * Stable error codes for write results. These are sanitized — they never
+ * contain raw server response text, tokens, or internal implementation details.
+ */
+export type IngestErrorCode =
+  | "INGEST_REJECTED"
+  | "INGEST_UNAVAILABLE"
+  | "INGEST_TIMEOUT"
+  | "INGEST_NOT_CONFIGURED";
+
 export type WriteResult = {
-  path: "http_ingest" | "d1_direct";
+  path: "http_ingest" | "d1_direct" | "failed";
   pendingWritten: number;
   skippedDuplicates: number;
   discarded: number;
@@ -34,49 +49,111 @@ function toIngestPayload(c: BeatCandidate) {
   };
 }
 
+/** Resolve the HTTP ingest timeout from env, clamped to safe bounds. */
+function resolveTimeout(env: Env): number {
+  const raw = Number(env.KEYSTONE_INGEST_TIMEOUT_MS);
+  if (!Number.isFinite(raw)) return DEFAULT_INGEST_TIMEOUT_MS;
+  return Math.max(MIN_INGEST_TIMEOUT_MS, Math.min(MAX_INGEST_TIMEOUT_MS, raw));
+}
+
+/**
+ * Classify a non-success HTTP response into a stable error code.
+ * Never includes the response body or arbitrary server text.
+ */
+function classifyHttpError(status: number): IngestErrorCode {
+  if (status === 401 || status === 403) return "INGEST_REJECTED";
+  if (status === 415 || status === 400 || status === 422 || status === 413 || status === 405) {
+    return "INGEST_REJECTED";
+  }
+  return "INGEST_UNAVAILABLE";
+}
+
 async function writeViaHttpIngest(
   secret: string,
   candidates: BeatCandidate[],
+  timeoutMs: number,
 ): Promise<WriteResult> {
-  const res = await fetch(INGEST_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${secret}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ candidates: candidates.map(toIngestPayload) }),
-  });
-  const body = (await res.json().catch(() => ({}))) as {
-    inserted?: number;
-    skippedDuplicates?: number;
-    discarded?: number;
-    errors?: string[];
-    items?: Array<{ originalUrl: string; relevanceScore: number; category?: string }>;
-    error?: string;
-  };
-  if (!res.ok) {
-    throw new Error(`HTTP ingest failed: ${res.status} ${body.error || JSON.stringify(body).slice(0, 200)}`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(INGEST_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ candidates: candidates.map(toIngestPayload) }),
+      signal: controller.signal,
+    });
+
+    const body = (await res.json().catch(() => ({}))) as {
+      inserted?: number;
+      skippedDuplicates?: number;
+      discarded?: number;
+      errors?: string[];
+      items?: Array<{ originalUrl: string; relevanceScore: number; category?: string }>;
+      error?: string;
+    };
+
+    if (!res.ok) {
+      const code = classifyHttpError(res.status);
+      return {
+        path: "failed",
+        pendingWritten: 0,
+        skippedDuplicates: 0,
+        discarded: 0,
+        errors: [`${code}:${res.status}`],
+        items: [],
+      };
+    }
+
+    return {
+      path: "http_ingest",
+      pendingWritten: body.inserted ?? 0,
+      skippedDuplicates: body.skippedDuplicates ?? 0,
+      discarded: body.discarded ?? 0,
+      errors: body.errors ?? [],
+      items: (body.items ?? []).map((i, idx) => ({
+        originalUrl: i.originalUrl,
+        relevanceScore: i.relevanceScore,
+        headline: candidates[idx]?.headline ?? i.originalUrl,
+        teamSlug: candidates.find((c) => c.originalUrl === i.originalUrl)?.teamSlug,
+      })),
+    };
+  } catch (err) {
+    // Distinguish timeout from other network failures.
+    if (err instanceof DOMException && err.name === "AbortError") {
+      return {
+        path: "failed",
+        pendingWritten: 0,
+        skippedDuplicates: 0,
+        discarded: 0,
+        errors: ["INGEST_TIMEOUT"],
+        items: [],
+      };
+    }
+    return {
+      path: "failed",
+      pendingWritten: 0,
+      skippedDuplicates: 0,
+      discarded: 0,
+      errors: ["INGEST_UNAVAILABLE"],
+      items: [],
+    };
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return {
-    path: "http_ingest",
-    pendingWritten: body.inserted ?? 0,
-    skippedDuplicates: body.skippedDuplicates ?? 0,
-    discarded: body.discarded ?? 0,
-    errors: body.errors ?? [],
-    items: (body.items ?? []).map((i, idx) => ({
-      originalUrl: i.originalUrl,
-      relevanceScore: i.relevanceScore,
-      headline: candidates[idx]?.headline ?? i.originalUrl,
-      teamSlug: candidates.find((c) => c.originalUrl === i.originalUrl)?.teamSlug,
-    })),
-  };
 }
 
 function newBeatId(): string {
   return `beat_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
 }
 
-/** Direct D1 INSERT matching beat_items schema — PENDING only, never approve. */
+/**
+ * Direct D1 INSERT matching beat_items schema — PENDING only, never approve.
+ * Only used when KEYSTONE_ALLOW_DIRECT_D1_FALLBACK=true is explicitly set.
+ */
 async function writeViaD1(env: Env, candidates: BeatCandidate[]): Promise<WriteResult> {
   let pendingWritten = 0;
   let skippedDuplicates = 0;
@@ -161,7 +238,16 @@ async function writeViaD1(env: Env, candidates: BeatCandidate[]): Promise<WriteR
 
 /**
  * Prefer HTTP ingest with KEYSTONE_BEAT_INGEST_SECRET (narrow permissions).
- * Fall back to direct D1 INSERT if ingest secret unavailable.
+ *
+ * If the ingest secret is configured, HTTP ingest is the ONLY write path.
+ * HTTP failures (auth, validation, timeout, network) do NOT fall back to D1.
+ *
+ * Direct D1 writes are only used when:
+ *   1. No ingest secret is configured, OR
+ *   2. KEYSTONE_ALLOW_DIRECT_D1_FALLBACK=true is explicitly set (dev/emergency).
+ *
+ * This ensures the authenticated HTTP boundary is authoritative — a failed
+ * ingest request cannot bypass validation by writing directly to D1.
  */
 export async function writePendingCandidates(
   env: Env,
@@ -177,19 +263,27 @@ export async function writePendingCandidates(
       items: [],
     };
   }
+
   const ingestSecret = (env.KEYSTONE_BEAT_INGEST_SECRET || "").trim();
+  const allowD1Fallback =
+    (env.KEYSTONE_ALLOW_DIRECT_D1_FALLBACK || "").trim().toLowerCase() === "true";
+
   if (ingestSecret) {
+    // HTTP ingest is the only path when the secret is configured,
+    // unless explicit D1 fallback is enabled.
+    if (!allowD1Fallback) {
+      return await writeViaHttpIngest(ingestSecret, candidates, resolveTimeout(env));
+    }
+    // Explicit fallback mode: try HTTP first, fall back to D1 on failure.
     try {
-      return await writeViaHttpIngest(ingestSecret, candidates);
-    } catch (err) {
-      // Fall back to D1 if HTTP path fails
-      const fallback = await writeViaD1(env, candidates);
-      fallback.errors = [
-        `http_ingest_failed: ${err instanceof Error ? err.message : String(err)}`,
-        ...fallback.errors,
-      ];
-      return fallback;
+      return await writeViaHttpIngest(ingestSecret, candidates, resolveTimeout(env));
+    } catch {
+      // Unexpected exception from writeViaHttpIngest (should not happen —
+      // it catches internally and returns a WriteResult). Fall back to D1.
+      return await writeViaD1(env, candidates);
     }
   }
+
+  // No ingest secret configured: use direct D1 (dev/local mode).
   return writeViaD1(env, candidates);
 }
