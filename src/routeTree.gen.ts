@@ -19,7 +19,7 @@ import { Route as OddsRouteImport } from './routes/odds'
 import { Route as StandingsRouteImport } from './routes/standings'
 import { Route as ApiAutoRecapRouteImport } from './routes/api/auto-recap'
 import { Route as ApiStandingsDebugRouteImport } from './routes/api/standings-debug'
-import { Route as EditorBeatRouteImport } from './routes/editor.beat'
+import { Route as EditorBeatRouteImport } from './routes/editor_.beat'
 import { Route as TeamsIndexRouteImport } from './routes/teams/index'
 import { Route as TeamsSlugRouteImport } from './routes/teams/$slug'
 
@@ -74,9 +74,9 @@ const ApiStandingsDebugRoute = ApiStandingsDebugRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const EditorBeatRoute = EditorBeatRouteImport.update({
-  id: '/beat',
-  path: '/beat',
-  getParentRoute: () => EditorRoute,
+  id: '/editor_/beat',
+  path: '/editor/beat',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const TeamsIndexRoute = TeamsIndexRouteImport.update({
   id: '/teams/',
@@ -93,7 +93,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/calendar': typeof CalendarRoute
   '/desk': typeof DeskRoute
-  '/editor': typeof EditorRouteWithChildren
+  '/editor': typeof EditorRoute
   '/game': typeof GameRoute
   '/news': typeof NewsRoute
   '/odds': typeof OddsRoute
@@ -108,7 +108,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/calendar': typeof CalendarRoute
   '/desk': typeof DeskRoute
-  '/editor': typeof EditorRouteWithChildren
+  '/editor': typeof EditorRoute
   '/game': typeof GameRoute
   '/news': typeof NewsRoute
   '/odds': typeof OddsRoute
@@ -124,14 +124,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/calendar': typeof CalendarRoute
   '/desk': typeof DeskRoute
-  '/editor': typeof EditorRouteWithChildren
+  '/editor': typeof EditorRoute
   '/game': typeof GameRoute
   '/news': typeof NewsRoute
   '/odds': typeof OddsRoute
   '/standings': typeof StandingsRoute
   '/api/auto-recap': typeof ApiAutoRecapRoute
   '/api/standings-debug': typeof ApiStandingsDebugRoute
-  '/editor/beat': typeof EditorBeatRoute
+  '/editor_/beat': typeof EditorBeatRoute
   '/teams/$slug': typeof TeamsSlugRoute
   '/teams/': typeof TeamsIndexRoute
 }
@@ -178,7 +178,7 @@ export interface FileRouteTypes {
     | '/standings'
     | '/api/auto-recap'
     | '/api/standings-debug'
-    | '/editor/beat'
+    | '/editor_/beat'
     | '/teams/$slug'
     | '/teams/'
   fileRoutesById: FileRoutesById
@@ -187,13 +187,14 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CalendarRoute: typeof CalendarRoute
   DeskRoute: typeof DeskRoute
-  EditorRoute: typeof EditorRouteWithChildren
+  EditorRoute: typeof EditorRoute
   GameRoute: typeof GameRoute
   NewsRoute: typeof NewsRoute
   OddsRoute: typeof OddsRoute
   StandingsRoute: typeof StandingsRoute
   ApiAutoRecapRoute: typeof ApiAutoRecapRoute
   ApiStandingsDebugRoute: typeof ApiStandingsDebugRoute
+  EditorBeatRoute: typeof EditorBeatRoute
   TeamsSlugRoute: typeof TeamsSlugRoute
   TeamsIndexRoute: typeof TeamsIndexRoute
 }
@@ -270,12 +271,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStandingsDebugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/editor/beat': {
-      id: '/editor/beat'
-      path: '/beat'
+    '/editor_/beat': {
+      id: '/editor_/beat'
+      path: '/editor/beat'
       fullPath: '/editor/beat'
       preLoaderRoute: typeof EditorBeatRouteImport
-      parentRoute: typeof EditorRoute
+      parentRoute: typeof rootRouteImport
     }
     '/teams/': {
       id: '/teams/'
@@ -294,28 +295,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface EditorRouteChildren {
-  EditorBeatRoute: typeof EditorBeatRoute
-}
-
-const EditorRouteChildren: EditorRouteChildren = {
-  EditorBeatRoute: EditorBeatRoute,
-}
-
-const EditorRouteWithChildren =
-  EditorRoute._addFileChildren(EditorRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CalendarRoute: CalendarRoute,
   DeskRoute: DeskRoute,
-  EditorRoute: EditorRouteWithChildren,
+  EditorRoute: EditorRoute,
   GameRoute: GameRoute,
   NewsRoute: NewsRoute,
   OddsRoute: OddsRoute,
   StandingsRoute: StandingsRoute,
   ApiAutoRecapRoute: ApiAutoRecapRoute,
   ApiStandingsDebugRoute: ApiStandingsDebugRoute,
+  EditorBeatRoute: EditorBeatRoute,
   TeamsSlugRoute: TeamsSlugRoute,
   TeamsIndexRoute: TeamsIndexRoute,
 }
