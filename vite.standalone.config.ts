@@ -7,7 +7,7 @@ export default defineConfig({
   resolve: { tsconfigPaths: true },
   ssr: { external: ['cloudflare:workers'] },
   define: { 'import.meta.env.VITE_AUTH_ENABLED': JSON.stringify('false'), 'import.meta.env.VITE_STANDALONE': JSON.stringify('true') },
-  plugins: [{ name: 'cloudflare-native-bindings', enforce: 'pre', resolveId(id) { if (id === 'cloudflare:workers') return { id, external: true }; } }, tailwindcss(), tanstackStart(), nitro({
+  plugins: [{ name: 'cloudflare-native-bindings', enforce: 'pre', resolveId(id) { if (id === 'cloudflare:workers') return { id, external: true }; } }, tailwindcss(), tanstackStart({ serverFns: { base: '/editor/_serverFn' } }), nitro({
     preset: 'cloudflare-module', serverDir: false,
     // Rolldown can emit an undeclared `ssr_exports` namespace when the SSR
     // service entry is split across mutually-importing chunks (Beat M1 tipped

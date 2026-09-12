@@ -44,7 +44,7 @@ export function identity() {
 }
 export function requireAdmin() {
   const user = identity();
-  if (!user.id || !user.admin) throw new Error('Only the configured owner can publish updates.');
+  if (!user.id || !user.admin) throw new Error('Only the configured owner can publish updates. Cloudflare Access identity was not present on this request — reload /editor while signed in and retry.');
   return user.id;
 }
 export async function requireAiAccess() {

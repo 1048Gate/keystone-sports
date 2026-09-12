@@ -15,6 +15,32 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { TEAMS } from "@/data/teams";
 
+
+/** Surface serverFn / Access failures clearly (opaque HTML redirects, serialized errors). */
+function beatActionErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    const msg = error.message.trim();
+    // Access challenge often returns HTML login page as the thrown text.
+    if (
+      /cf-access|cloudflare\s+access|attention required/i.test(msg) ||
+      (/<!doctype html/i.test(msg) && /access/i.test(msg))
+    ) {
+      return "Cloudflare Access session missing on this action. Reload /editor/beat while signed in as the owner, then try again.";
+    }
+    if (/only the configured owner/i.test(msg) || /sign in as the site owner/i.test(msg)) {
+      return `${msg} If the desk loaded but Approve fails, reload while signed into Access so the admin cookie covers server actions.`;
+    }
+    return msg;
+  }
+  if (typeof error === "string" && error.trim()) return error.trim();
+  if (error && typeof error === "object") {
+    const rec = error as Record<string, unknown>;
+    if (typeof rec.message === "string" && rec.message.trim()) return rec.message.trim();
+    if (typeof rec.error === "string" && rec.error.trim()) return rec.error.trim();
+  }
+  return "Action failed. Check your Cloudflare Access session and try again.";
+}
+
 export const Route = createFileRoute("/editor_/beat")({
   loader: async () => {
     const access = await getSiteAccess();
@@ -37,6 +63,7 @@ function BeatEditorPage() {
   const { access, desk } = Route.useLoaderData();
   const router = useRouter();
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"ok" | "error">("ok");
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -83,19 +110,25 @@ function BeatEditorPage() {
     );
   }
 
-  async function refresh(msg: string) {
-    setMessage(msg);
+  async function refresh(msg?: string) {
+    if (msg) {
+      setMessageTone("ok");
+      setMessage(msg);
+    }
     await router.invalidate();
   }
 
   async function run(action: () => Promise<unknown>, ok: string) {
     setBusy(true);
     setMessage("");
+    setMessageTone("ok");
     try {
       await action();
-      await refresh(ok);
+      await refresh(ok || undefined);
+      if (ok) setMessageTone("ok");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Action failed.");
+      setMessageTone("error");
+      setMessage(beatActionErrorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -113,7 +146,7 @@ function BeatEditorPage() {
         D1-backed candidate queue. Approve is manual only — discovery never auto-publishes. Public strip flag:{" "}
         <code>KEYSTONE_BEAT_M1</code> ({desk.enabled ? "on" : "off"}). Storage: {desk.source}.
       </p>
-      {message ? <p className="mt-3 text-sm text-accent">{message}</p> : null}
+      {message ? <p className={`mt-3 rounded-md px-3 py-2 text-sm ${messageTone === "error" ? "bg-red-950/40 text-red-200 ring-1 ring-red-500/40" : "text-accent"}`} role={messageTone === "error" ? "alert" : "status"}>{message}</p> : null}
 
       <div className="mt-6 flex flex-wrap gap-2">
         {(["pending", "approved", "rejected", "all"] as const).map((key) => (
@@ -141,6 +174,7 @@ function BeatEditorPage() {
           onClick={() =>
             void run(async () => {
               const result = await discoverBeatCandidates({ data: { dryRun: true, perAccountLimit: 2 } });
+              setMessageTone("ok");
               setMessage(`Dry-run: ${result.candidates.length} candidates, ${result.skippedDuplicates} dupes.`);
             }, "")
           }
