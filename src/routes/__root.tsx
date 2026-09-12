@@ -17,7 +17,7 @@ export const Route = createRootRoute({
         content:
           "Daily Pennsylvania sports: Philly and Pittsburgh scores, calendars, lines, news, and an editor for your own notes.",
       },
-      { name: "theme-color", content: "#102036" },
+      { name: "theme-color", content: "#0a0e16" },
     ],
     links: [
       { rel: "icon", type: "image/png", href: "/brand/two-hounds-mark.png" },

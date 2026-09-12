@@ -1,42 +1,168 @@
+/* Drop-in replacement for src/styles.css
+   Phase 0 dark desk tokens + existing Keystone utilities. */
+
 @import "tailwindcss";
 
-@theme {
-  --color-bg: #f3efe6;
-  --color-surface: #fffcf6;
-  --color-elevated: #e8e2d6;
-  --color-fg: #14181f;
-  --color-muted: #5c5852;
-  --color-subtle: #8a847a;
-  --color-primary: #102036;
-  --color-primary-fg: #f3efe6;
-  --color-accent: #c81e2b;
-  --color-accent-fg: #fff7f6;
-  --color-scoreboard: #102036;
-  --color-scoreboard-fg: #f3efe6;
-  --color-border: color-mix(in oklab, #14181f 12%, transparent);
-  --color-border-strong: color-mix(in oklab, #14181f 22%, transparent);
-  --color-ok: #2f7d56;
-  --color-warn: #b5791c;
-  --color-danger: #c81e2b;
-  --color-live: #c81e2b;
-  --color-live-fg: #fff7f6;
-  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Oswald", "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 18px;
-  --shadow-border: 0 0 0 1px rgba(20, 24, 31, 0.08), 0 1px 2px -1px rgba(20, 24, 31, 0.06);
-  --shadow-border-hover: 0 0 0 1px rgba(20, 24, 31, 0.14), 0 2px 8px -2px rgba(20, 24, 31, 0.08);
+/* :root is the source of truth. --ks-* names avoid circular @theme refs. */
+:root {
+  --ks-navy-950: #070b12;
+  --ks-navy-900: #0a0e16;
+  --ks-navy-800: #121826;
+  --ks-navy-700: #1a2233;
+
+  --ks-bg: var(--ks-navy-900);
+  --ks-surface: var(--ks-navy-800);
+  --ks-elevated: var(--ks-navy-700);
+  --ks-overlay: color-mix(in oklab, var(--ks-navy-950) 72%, transparent);
+
+  --ks-fg: #f4f1ea;
+  --ks-muted: #a8b0be;
+  --ks-subtle: #6e7787;
+
+  --ks-border: color-mix(in oklab, var(--ks-fg) 12%, transparent);
+  --ks-border-strong: color-mix(in oklab, var(--ks-fg) 22%, transparent);
+
+  --ks-accent: #e8b84a;
+  --ks-accent-hover: #f0c462;
+  --ks-accent-muted: #8f6f28;
+  --ks-accent-fg: #14110a;
+  --ks-accent-soft: color-mix(in oklab, var(--ks-accent) 16%, transparent);
+
+  --ks-badge-breaking: #f0522e;
+  --ks-badge-breaking-fg: #fff7f4;
+  --ks-badge-breaking-soft: color-mix(in oklab, var(--ks-badge-breaking) 18%, transparent);
+
+  --ks-badge-reaction: #2bb8a8;
+  --ks-badge-reaction-fg: #041412;
+  --ks-badge-reaction-soft: color-mix(in oklab, var(--ks-badge-reaction) 18%, transparent);
+
+  --ks-badge-watch: #3d8bff;
+  --ks-badge-watch-fg: #f4f8ff;
+  --ks-badge-watch-soft: color-mix(in oklab, var(--ks-badge-watch) 18%, transparent);
+
+  --ks-ok: #3dba86;
+  --ks-warn: #e0a33a;
+  --ks-danger: var(--ks-badge-breaking);
+  --ks-live: var(--ks-badge-breaking);
+  --ks-live-fg: var(--ks-badge-breaking-fg);
+
+  --ks-font-display: "Oswald", "Arial Narrow", ui-sans-serif, system-ui, sans-serif;
+  --ks-font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+
+  --ks-text-1: clamp(0.75rem, 0.72rem + 0.15vw, 0.8125rem);
+  --ks-text-2: clamp(0.8125rem, 0.78rem + 0.2vw, 0.875rem);
+  --ks-text-3: clamp(1rem, 0.94rem + 0.3vw, 1.125rem);
+  --ks-text-4: clamp(1.25rem, 1.1rem + 0.7vw, 1.5rem);
+  --ks-text-5: clamp(1.75rem, 1.35rem + 1.6vw, 2.25rem);
+  --ks-text-6: clamp(2.25rem, 1.4rem + 3.4vw, 3.5rem);
+
+  --ks-leading-1: 1.4;
+  --ks-leading-2: 1.4;
+  --ks-leading-3: 1.6;
+  --ks-leading-4: 1.28;
+  --ks-leading-5: 1.12;
+  --ks-leading-6: 0.95;
+
+  --ks-tracking-display: 0.04em;
+  --ks-tracking-label: 0.08em;
+  --ks-tracking-body: 0;
+
+  --ks-space-1: 0.25rem;
+  --ks-space-2: 0.5rem;
+  --ks-space-3: 1rem;
+  --ks-space-4: 1.5rem;
+  --ks-space-5: 2.5rem;
+  --ks-space-6: 4rem;
+
+  --ks-radius-sm: 4px;
+  --ks-radius-md: 8px;
+  --ks-radius-lg: 12px;
+  --ks-radius-xl: 18px;
+  --ks-radius-pill: 999px;
+
+  --ks-shadow-border: 0 0 0 1px var(--ks-border), 0 1px 2px -1px rgb(0 0 0 / 0.45);
+  --ks-shadow-border-hover: 0 0 0 1px var(--ks-border-strong), 0 8px 24px -12px rgb(0 0 0 / 0.55);
+  --ks-shadow-elevated: 0 0 0 1px var(--ks-border), 0 8px 24px -12px rgb(0 0 0 / 0.55);
+}
+
+@theme inline {
+  --color-bg: var(--ks-bg);
+  --color-surface: var(--ks-surface);
+  --color-elevated: var(--ks-elevated);
+  --color-overlay: var(--ks-overlay);
+  --color-fg: var(--ks-fg);
+  --color-muted: var(--ks-muted);
+  --color-subtle: var(--ks-subtle);
+
+  --color-primary: var(--ks-accent);
+  --color-primary-fg: var(--ks-accent-fg);
+
+  --color-accent: var(--ks-accent);
+  --color-accent-hover: var(--ks-accent-hover);
+  --color-accent-muted: var(--ks-accent-muted);
+  --color-accent-fg: var(--ks-accent-fg);
+  --color-accent-soft: var(--ks-accent-soft);
+
+  --color-scoreboard: var(--ks-navy-950);
+  --color-scoreboard-fg: var(--ks-fg);
+
+  --color-border: var(--ks-border);
+  --color-border-strong: var(--ks-border-strong);
+
+  --color-ok: var(--ks-ok);
+  --color-warn: var(--ks-warn);
+  --color-danger: var(--ks-danger);
+  --color-live: var(--ks-live);
+  --color-live-fg: var(--ks-live-fg);
+
+  --color-badge-breaking: var(--ks-badge-breaking);
+  --color-badge-breaking-fg: var(--ks-badge-breaking-fg);
+  --color-badge-breaking-soft: var(--ks-badge-breaking-soft);
+  --color-badge-reaction: var(--ks-badge-reaction);
+  --color-badge-reaction-fg: var(--ks-badge-reaction-fg);
+  --color-badge-reaction-soft: var(--ks-badge-reaction-soft);
+  --color-badge-watch: var(--ks-badge-watch);
+  --color-badge-watch-fg: var(--ks-badge-watch-fg);
+  --color-badge-watch-soft: var(--ks-badge-watch-soft);
+
+  --font-sans: var(--ks-font-sans);
+  --font-display: var(--ks-font-display);
+  --font-mono: var(--ks-font-sans);
+
+  --text-t1: var(--ks-text-1);
+  --text-t2: var(--ks-text-2);
+  --text-t3: var(--ks-text-3);
+  --text-t4: var(--ks-text-4);
+  --text-t5: var(--ks-text-5);
+  --text-t6: var(--ks-text-6);
+
+  --spacing-ds-1: var(--ks-space-1);
+  --spacing-ds-2: var(--ks-space-2);
+  --spacing-ds-3: var(--ks-space-3);
+  --spacing-ds-4: var(--ks-space-4);
+  --spacing-ds-5: var(--ks-space-5);
+  --spacing-ds-6: var(--ks-space-6);
+
+  --radius-sm: var(--ks-radius-sm);
+  --radius-md: var(--ks-radius-md);
+  --radius-lg: var(--ks-radius-lg);
+  --radius-xl: var(--ks-radius-xl);
+  --radius-pill: var(--ks-radius-pill);
+
+  --shadow-border: var(--ks-shadow-border);
+  --shadow-border-hover: var(--ks-shadow-border-hover);
+  --shadow-elevated: var(--ks-shadow-elevated);
 }
 
 @layer base {
   html,
   body {
-    background: var(--color-bg);
-    color: var(--color-fg);
-    font-family: var(--font-sans);
+    background: var(--ks-bg);
+    color: var(--ks-fg);
+    font-family: var(--ks-font-sans);
+    font-size: var(--ks-text-3);
+    line-height: var(--ks-leading-3);
+    letter-spacing: var(--ks-tracking-body);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -44,6 +170,9 @@
   h1,
   h2,
   h3 {
+    font-family: var(--ks-font-display);
+    font-weight: 600;
+    letter-spacing: var(--ks-tracking-display);
     text-wrap: balance;
   }
 
@@ -57,16 +186,23 @@
   }
 
   ::selection {
-    background: color-mix(in oklab, var(--color-accent) 28%, transparent);
+    background: color-mix(in oklab, var(--ks-accent) 32%, transparent);
+    color: var(--ks-fg);
   }
 
   img {
-    outline: 1px solid rgba(20, 24, 31, 0.08);
+    outline: 1px solid var(--ks-border);
     outline-offset: -1px;
   }
 
   img[data-logo] {
     outline: none;
+  }
+
+  button:focus-visible,
+  a:focus-visible {
+    outline: 3px solid var(--ks-accent);
+    outline-offset: 3px;
   }
 }
 
@@ -112,14 +248,34 @@
   }
 }
 
-button:focus-visible, a:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 3px; }
 @media (max-width: 639px) {
-  .home-summary h1 { font-size: 1.5rem; line-height: 1.25; }
-  .home-summary article { padding: 0.75rem; }
-  .home-summary article img { width: 1.75rem; height: 1.75rem; }
-  .home-summary article .space-y-3 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-  .home-summary article .space-y-3 > * { margin: 0; }
-  .home-summary article .text-2xl { font-size: 1.125rem; }
-  .home-summary .h-16 { height: 3rem; min-width: 3rem; }
-  .home-summary .mt-5 { margin-top: 0.75rem; }
+  .home-summary h1 {
+    font-size: var(--ks-text-4);
+    line-height: var(--ks-leading-4);
+  }
+  .home-summary article {
+    padding: var(--ks-space-3);
+  }
+  .home-summary article img {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+  .home-summary article .space-y-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  .home-summary article .space-y-3 > * {
+    margin: 0;
+  }
+  .home-summary article .text-2xl {
+    font-size: var(--ks-text-4);
+  }
+  .home-summary .h-16 {
+    height: 3rem;
+    min-width: 3rem;
+  }
+  .home-summary .mt-5 {
+    margin-top: var(--ks-space-3);
+  }
 }
