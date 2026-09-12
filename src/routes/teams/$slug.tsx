@@ -3,6 +3,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { FollowButton } from "@/components/follow-button";
 import { GameCard } from "@/components/game-card";
 import { PendingScreen } from "@/components/pending-screen";
+import { ResponsibleGamblingNote } from "@/components/responsible-gambling-note";
 import { RouteError } from "@/components/route-error";
 import { HIGHLIGHT_BY_SLUG } from "@/data/highlights";
 import { TEAM_BY_SLUG, teamLogo } from "@/data/teams";
@@ -33,7 +34,6 @@ export const Route = createFileRoute("/teams/$slug")({
   loader: async ({ params }) => {
     const team = TEAM_BY_SLUG[params.slug];
     if (!team) throw notFound();
-    // Cap wait so Worker 1102 / hung upstream never leaves PendingScreen forever.
     let page: TeamPageData | null = null;
     let loadWarning: string | undefined;
     try {
@@ -252,9 +252,7 @@ function TeamPage() {
           </p>
         </aside>
       </div>
-      <p className="mx-auto max-w-6xl px-4 pb-8 text-xs text-subtle sm:px-6">
-        Lines on this page are for information only. 21+ · If you gamble, call 1-800-GAMBLER.
-      </p>
+      <ResponsibleGamblingNote className="mx-auto max-w-6xl px-4 pb-8 sm:px-6" />
     </>
   );
 }
