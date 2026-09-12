@@ -45,7 +45,7 @@ export function DeskArticle({ item }: { item: NewsItem }) {
     <article className="flex h-full flex-col overflow-hidden rounded-md bg-surface shadow-[var(--shadow-border)]">
       {item.image ? (
         <a href={item.href} target="_blank" rel="noreferrer" className="block">
-          <img src={item.image} alt="" className="h-40 w-full object-cover" />
+          <img src={item.image} alt="" width={640} height={160} loading="lazy" decoding="async" className="h-40 w-full object-cover" />
         </a>
       ) : null}
       <div className="flex flex-1 flex-col p-4">
