@@ -6,6 +6,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { FilterChips } from "@/components/filter-chips";
 import { GameCard } from "@/components/game-card";
+import { FadeSwap } from "@/components/fade-swap";
 import { MonthGrid } from "@/components/month-grid";
 import { PendingScreen } from "@/components/pending-screen";
 import { RouteError } from "@/components/route-error";
@@ -104,30 +105,32 @@ function CalendarPage() {
 
         <div className={agenda ? "hidden" : "mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.9fr)]"}>
           <MonthGrid month={month} games={games} selected={selected} onSelect={setSelected} />
-          <div>
-            <h2 className="font-display text-2xl tracking-wide">{formatLongDate(selected)}</h2>
-            <PublishedUpdates date={selected} />
-            <p className="mt-1 text-sm text-muted">
-              {dayGames.length + dayEvents.length
-                ? `${dayGames.length + dayEvents.length} listed`
-                : "Nothing listed"}
-            </p>
-            <div className="mt-4 space-y-3">
-              {dayEvents.map((e) => (
-                <div key={e.id} className="rounded-md border border-dashed border-border-strong bg-surface p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-accent">{e.sport || "Editor"}</p>
-                  <p className="font-display text-xl">
-                    {e.time ? `${e.time} · ` : ""}
-                    {e.title}
-                  </p>
-                  {e.notes ? <p className="mt-1 text-sm text-muted">{e.notes}</p> : null}
-                </div>
-              ))}
-              {dayGames.map((g) => (
-                <GameCard key={g.id} game={g} />
-              ))}
+          <FadeSwap id={`day-${selected}`}>
+            <div>
+              <h2 className="font-display text-2xl tracking-wide">{formatLongDate(selected)}</h2>
+              <PublishedUpdates date={selected} />
+              <p className="mt-1 text-sm text-muted">
+                {dayGames.length + dayEvents.length
+                  ? `${dayGames.length + dayEvents.length} listed`
+                  : "Nothing listed"}
+              </p>
+              <div className="mt-4 space-y-3">
+                {dayEvents.map((e) => (
+                  <div key={e.id} className="rounded-md border border-dashed border-border-strong bg-surface p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-accent">{e.sport || "Editor"}</p>
+                    <p className="font-display text-xl">
+                      {e.time ? `${e.time} · ` : ""}
+                      {e.title}
+                    </p>
+                    {e.notes ? <p className="mt-1 text-sm text-muted">{e.notes}</p> : null}
+                  </div>
+                ))}
+                {dayGames.map((g) => (
+                  <GameCard key={g.id} game={g} />
+                ))}
+              </div>
             </div>
-          </div>
+          </FadeSwap>
         </div>
       </div>
   );
