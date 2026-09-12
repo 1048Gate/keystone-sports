@@ -1,4 +1,5 @@
 import { FeedStatus } from '@/components/feed-status';
+import { ResponsibleGamblingNote } from '@/components/responsible-gambling-note';
 import { useMemo, useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { FilterChips } from "@/components/filter-chips";
@@ -156,13 +157,9 @@ function OddsPage() {
         </div>
         <p className="mt-4 text-xs text-subtle">
           Lines are from ESPN’s public board; the supplied provider is shown per game. Games farther out — especially later MLB dates — may
-          not have a number yet. Not an offer to bet. 21+. If gambling is a problem, call 1-800-GAMBLER. Log a pick
-          in the{" "}
-          <Link to="/desk" className="text-fg underline-offset-2 hover:underline">
-            editor
-          </Link>{" "}
-          if you want a private record.
+          not have a number yet. Not an offer to bet.
         </p>
+        <ResponsibleGamblingNote className="mt-2" deskLink />
       </div>
   );
 }
