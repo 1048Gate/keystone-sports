@@ -17,7 +17,7 @@ import { TeamRail } from "@/components/team-rail";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TEAM_BY_SLUG } from "@/data/teams";
-import { getMonthBoard, getNewsFeed, getTodayBoard, generateBrief } from "@/lib/sports/api";
+import { getNewsFeed, getTodayBoard, generateBrief } from "@/lib/sports/api";
 import { rememberBoard } from "@/lib/sports/board-cache";
 import { useFollows } from "@/lib/sports/follow-store";
 import { applyView, featuredLabel, humanKicker, isFollowedGame, pickFeatured, rankPaNews } from "@/lib/sports/filter";
@@ -37,8 +37,11 @@ export const Route = createFileRoute("/")({
   loaderDeps: ({ search }) => ({ date: search.date }),
   loader: async ({ deps }) => {
     const board = await getTodayBoard({ data: { date: deps.date } });
-    const posts = await getPublishedPosts({ data: { date: board.date } }).catch(() => [] as Post[]);
-    return { board, posts };
+    const [posts, news] = await Promise.all([
+      getPublishedPosts({ data: { date: board.date } }).catch(() => [] as Post[]),
+      getNewsFeed().catch(() => ({ articles: [] as NewsItem[] })),
+    ]);
+    return { board, posts, news };
   },
   staleTime: 20_000,
   pendingComponent: PendingScreen,
@@ -61,7 +64,7 @@ function TodayPage() {
   const navigate = Route.useNavigate();
   const loader = Route.useLoaderData();
   const [board, setBoard] = useState(loader.board);
-  const [news, setNews] = useState<{ articles: NewsItem[] }>({ articles: [] });
+  const [news, setNews] = useState<{ articles: NewsItem[] }>(loader.news ?? { articles: [] });
   const [brief, setBrief] = useState<string | null>(null);
   const [briefError, setBriefError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -84,11 +87,8 @@ function TodayPage() {
   }, [loader]);
 
   useEffect(() => {
-    void getNewsFeed()
-      .then(setNews)
-      .catch(() => undefined);
-    void getMonthBoard({ data: {} }).catch(() => undefined);
-  }, []);
+    if (loader.news) setNews(loader.news);
+  }, [loader]);
 
   useEffect(() => {
     if (search.region || search.sport) return;
@@ -381,6 +381,10 @@ function TodayPage() {
                   <img
                     src={lead.image}
                     alt=""
+                    width={704}
+                    height={176}
+                    loading="lazy"
+                    decoding="async"
                     className="h-44 w-full rounded-md object-cover"
                   />
                 </a>
