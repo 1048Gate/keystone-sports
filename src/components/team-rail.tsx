@@ -19,6 +19,7 @@ export function TeamRail() {
               params={{ slug: t.slug }}
               className="relative flex h-14 w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-1 hover:bg-elevated"
               title={on ? `${t.name} · Following` : t.name}
+              aria-label={on ? `${t.name}, following` : t.name}
             >
               {on ? (
                 <Star className="absolute top-1 right-1 h-3 w-3 fill-current text-accent" aria-hidden />
