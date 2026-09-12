@@ -1,14 +1,13 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { PendingScreen } from "@/components/pending-screen";
 import { RouteError } from "@/components/route-error";
 import { BeatModule } from "@/components/beat/beat-module";
+import { BreakingAlert, DeskArticle, LockerRoom, WireList, isPremiumBeat } from "@/components/news-feed";
 
-import { TEAM_BY_SLUG } from "@/data/teams";
 import { getNewsWire } from "@/lib/sports/api";
 import { getBeatDesk } from "@/lib/beat/api";
 import { rankPaNews } from "@/lib/sports/filter";
 import { useFollows } from "@/lib/sports/follow-store";
-import { relativeWhen } from "@/lib/sports/time";
 
 export const Route = createFileRoute("/news")({
   loader: async () => {
@@ -28,8 +27,11 @@ function NewsPage() {
   const { wire, beat } = Route.useLoaderData();
   const followed = useFollows((s) => s.slugs);
   const ranked = rankPaNews(wire.articles, followed);
-  const lead = ranked.find((a) => a.image) ?? ranked[0];
-  const rest = ranked.filter((a) => a.id !== lead?.id);
+  const premium = beat.enabled ? beat.items.filter(isPremiumBeat) : [];
+  const deskBeat = beat.enabled ? beat.items.filter((i) => !isPremiumBeat(i)) : [];
+  const deskWire = ranked.filter((a) => a.image).slice(0, 8);
+  const used = new Set(deskWire.map((a) => a.id));
+  const wireList = ranked.filter((a) => !used.has(a.id));
   const highlights = [...(wire.highlights ?? [])].sort((a, b) => {
     const af = a.teamSlug && followed.includes(a.teamSlug) ? 0 : 1;
     const bf = b.teamSlug && followed.includes(b.teamSlug) ? 0 : 1;
@@ -46,7 +48,27 @@ function NewsPage() {
         The beat, the local papers, and the locker room. Film rooms link out to the clubs — we don't host the tape.
       </p>
 
-      {beat.enabled ? <BeatModule items={beat.items} generatedAt={beat.generatedAt} /> : null}
+      {premium.length ? (
+        <section className="mt-8 space-y-3" aria-label="Breaking and pinned">
+          {premium.map((item) => (
+            <BreakingAlert key={item.id} item={item} />
+          ))}
+        </section>
+      ) : null}
+
+      {beat.enabled ? <BeatModule items={deskBeat} generatedAt={beat.generatedAt} /> : null}
+
+      {deskWire.length ? (
+        <section className="mt-10" aria-label="Beat desk">
+          <h2 className="font-display text-t4 tracking-display">From the papers</h2>
+          <p className="mt-1 text-t2 text-muted">Curated PA wire with art — not the full national firehose.</p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {deskWire.map((a) => (
+              <DeskArticle key={a.id} item={a} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {highlights.length ? (
         <section className="mt-8" aria-label="Highlights">
@@ -70,86 +92,9 @@ function NewsPage() {
         </section>
       ) : null}
 
-      {lead ? (
-        <article className="mt-8 grid gap-6 border-b border-border pb-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-          {lead.image ? (
-            <a href={lead.href} target="_blank" rel="noreferrer">
-              <img src={lead.image} alt="" className="h-56 w-full rounded-md object-cover sm:h-72" />
-            </a>
-          ) : (
-            <div className="rounded-md bg-elevated" />
-          )}
-          <div className="flex flex-col justify-center">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-              {lead.source ? `${lead.source} · ` : ""}
-              {TEAM_BY_SLUG[lead.teamSlug ?? ""]?.shortName ?? lead.league}
-              {lead.published ? ` · ${relativeWhen(lead.published)}` : ""}
-            </p>
-            <a href={lead.href} target="_blank" rel="noreferrer" className="mt-2 hover:text-accent">
-              <h2 className="font-display text-3xl leading-tight tracking-wide sm:text-4xl">{lead.headline}</h2>
-            </a>
-            {lead.description ? (
-              <p className="mt-3 text-base leading-relaxed text-muted">{lead.description}</p>
-            ) : null}
-          </div>
-        </article>
-      ) : null}
-
       <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1.4fr)_minmax(16rem,0.8fr)]">
-        <section className="space-y-6">
-          {rest.map((a) => {
-            const team = a.teamSlug ? TEAM_BY_SLUG[a.teamSlug] : undefined;
-            return (
-              <article key={a.id} className="flex gap-4 border-b border-border pb-6">
-                {a.image ? (
-                  <img
-                    src={a.image}
-                    alt=""
-                    className="hidden h-24 w-36 shrink-0 rounded-sm object-cover sm:block"
-                  />
-                ) : null}
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted">
-                    {a.source ? `${a.source} · ` : ""}
-                    {team?.shortName ?? a.league}
-                    {a.published ? ` · ${relativeWhen(a.published)}` : ""}
-                  </p>
-                  <a href={a.href} target="_blank" rel="noreferrer" className="mt-1 block hover:text-accent">
-                    <h2 className="font-display text-2xl leading-tight tracking-wide">{a.headline}</h2>
-                  </a>
-                  {a.description ? <p className="mt-2 text-sm leading-relaxed text-muted">{a.description}</p> : null}
-                </div>
-              </article>
-            );
-          })}
-        </section>
-
-        <aside>
-          <h2 className="font-display text-2xl tracking-wide">Locker room</h2>
-          <p className="mt-1 text-sm text-muted">Public fan threads, newest first.</p>
-          <ul className="mt-4 space-y-3">
-            {wire.buzz.map((b) => (
-              <li key={b.id} className="rounded-md bg-surface p-3 shadow-[var(--shadow-border)]">
-                <p className="text-xs uppercase tracking-wider text-subtle">
-                  r/{b.sub}
-                  {b.updated ? ` · ${relativeWhen(b.updated)}` : ""}
-                </p>
-                <a href={b.href} target="_blank" rel="noreferrer" className="mt-1 block text-sm leading-snug hover:text-accent">
-                  {b.title}
-                </a>
-                {TEAM_BY_SLUG[b.teamSlug] ? (
-                  <Link
-                    to="/teams/$slug"
-                    params={{ slug: b.teamSlug }}
-                    className="mt-2 inline-block text-xs text-muted hover:text-fg"
-                  >
-                    {TEAM_BY_SLUG[b.teamSlug].shortName}
-                  </Link>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </aside>
+        <WireList articles={wireList} />
+        <LockerRoom items={wire.buzz} />
       </div>
     </div>
   );
