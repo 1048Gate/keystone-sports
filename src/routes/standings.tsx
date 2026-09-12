@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { getStandings } from "@/lib/sports/api";
 import { FeedStatus } from "@/components/feed-status";
+import { ResponsibleGamblingNote } from "@/components/responsible-gambling-note";
 import { TEAM_BY_SLUG } from "@/data/teams";
 import { cn } from "@/lib/utils";
 import type { StandingsLeague, StandingRow } from "@/lib/sports/types";
@@ -211,7 +212,7 @@ function StandingsPage() {
         </div>
       ) : null}
       <p className="mt-8 text-xs text-subtle">Showing PA regional team divisions. Records reset for 2026 season.</p>
-      <p className="mt-2 text-xs text-subtle">Lines are for information only. 21+ · If you gamble, call 1-800-GAMBLER.</p>
+      <ResponsibleGamblingNote className="mt-2" />
     </div>
   );
 }
