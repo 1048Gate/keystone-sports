@@ -253,27 +253,27 @@
     font-size: var(--ks-text-4);
     line-height: var(--ks-leading-4);
   }
-  .home-summary article {
+  .home-summary article:not(.score-card) {
     padding: var(--ks-space-3);
   }
-  .home-summary article img {
+  .home-summary article:not(.score-card) img {
     width: 1.75rem;
     height: 1.75rem;
   }
-  .home-summary article .space-y-3 {
+  .home-summary article:not(.score-card) .space-y-3 {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.75rem;
   }
-  .home-summary article .space-y-3 > * {
+  .home-summary article:not(.score-card) .space-y-3 > * {
     margin: 0;
   }
-  .home-summary article .text-2xl {
+  .home-summary article:not(.score-card) .text-2xl {
     font-size: var(--ks-text-4);
   }
-  .home-summary .h-16 {
-    height: 3rem;
-    min-width: 3rem;
+  .home-summary .week-strip button {
+    min-height: 4rem;
+    min-width: 3.25rem;
   }
   .home-summary .mt-5 {
     margin-top: var(--ks-space-3);
