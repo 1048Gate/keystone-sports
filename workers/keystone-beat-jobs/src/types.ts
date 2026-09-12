@@ -22,6 +22,10 @@ export type Env = {
   KEYSTONE_APIFY_ENABLED?: string;
   KEYSTONE_JOBS_SECRET?: string;
   KEYSTONE_BEAT_INGEST_SECRET?: string;
+  /** "true" to allow direct D1 fallback when HTTP ingest fails (dev/emergency only). */
+  KEYSTONE_ALLOW_DIRECT_D1_FALLBACK?: string;
+  /** HTTP ingest timeout in ms (default 10000, clamped 3000–30000). */
+  KEYSTONE_INGEST_TIMEOUT_MS?: string;
 };
 
 export type RawApifyTweet = {
