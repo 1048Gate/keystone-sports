@@ -1,128 +1,174 @@
-import type { CSSProperties } from "react";
 import { Link } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { Game } from "@/lib/sports/types";
-import { formatKick, untilWhen } from "@/lib/sports/time";
-import { matchupLine } from "@/lib/sports/filter";
-import { TEAM_BY_SLUG } from "@/data/teams";
-import { downloadGameCalendar } from '@/lib/sports/calendar';
+import type { Game, GameSide } from "@/lib/sports/types";
+import { formatKick, formatTime } from "@/lib/sports/time";
+import { isFollowedGame } from "@/lib/sports/filter";
+import { useFollows } from "@/lib/sports/follow-store";
+import { downloadGameCalendar } from "@/lib/sports/calendar";
 
-function Side({
-  logo,
-  abbr,
-  name,
-  score,
-  winner,
-  slug,
-  muted,
-  big,
-}: {
-  logo: string;
-  abbr: string;
-  name: string;
-  score?: string;
-  winner?: boolean;
-  slug?: string;
-  muted?: boolean;
-  big?: boolean;
-}) {
-  const inner = (
-    <>
-      <img data-logo src={logo} alt="" className={cn("object-contain", big ? "h-11 w-11" : "h-8 w-8")} />
-      <div className="min-w-0 flex-1">
-        <p className={cn("truncate font-display tracking-wide", big ? "text-2xl" : "text-lg", muted && "text-muted")}>
-          {abbr}
-        </p>
-        <p className="truncate text-xs text-muted">{name}</p>
-      </div>
-      {score !== undefined && score !== "" ? (
-        <p
-          className={cn(
-            "font-display tabular-nums leading-none",
-            big ? "text-4xl" : "text-2xl",
-            winner || !muted ? "text-fg" : "text-muted",
-          )}
-        >
-          {score}
-        </p>
-      ) : null}
-    </>
+function Logo({ side, size }: { side: GameSide; size: "sm" | "lg" }) {
+  const img = (
+    <img
+      data-logo
+      src={side.logo}
+      alt=""
+      className={cn("object-contain", size === "lg" ? "h-12 w-12 sm:h-14 sm:w-14" : "h-10 w-10")}
+    />
   );
-  const cls = "flex items-center gap-3";
-  if (slug) {
-    return (
-      <Link to="/teams/$slug" params={{ slug }} className={cn(cls, "rounded-sm hover:bg-elevated/70")}>
-        {inner}
-      </Link>
-    );
-  }
-  return <div className={cls}>{inner}</div>;
+  if (!side.slug) return <div className="flex flex-col items-center gap-1">{img}</div>;
+  return (
+    <Link
+      to="/teams/$slug"
+      params={{ slug: side.slug }}
+      className="flex min-w-0 flex-col items-center gap-1 rounded-sm hover:bg-elevated/70"
+      aria-label={side.name}
+    >
+      {img}
+    </Link>
+  );
 }
 
-export function GameCard({ game, featured }: { game: Game; featured?: boolean }) {
-  const pa = TEAM_BY_SLUG[game.paSlugs[0] ?? ""];
+function TeamCol({ side, muted, align }: { side: GameSide; muted?: boolean; align: "left" | "right" }) {
+  return (
+    <div className={cn("flex min-w-0 flex-1 flex-col gap-1", align === "right" ? "items-end" : "items-start")}>
+      <Logo side={side} size="sm" />
+      <p
+        className={cn(
+          "max-w-full truncate font-display text-t2 tracking-display",
+          muted ? "text-muted" : "text-fg",
+        )}
+      >
+        {side.abbr}
+      </p>
+      <p className="hidden max-w-full truncate text-t1 text-subtle sm:block">{side.name}</p>
+    </div>
+  );
+}
+
+function CenterScore({ game, muted }: { game: Game; muted?: boolean }) {
   const live = game.status === "in";
   const done = game.status === "post";
-  const watch = untilWhen(game.start);
+  const away = game.away.score ?? "—";
+  const home = game.home.score ?? "—";
+
+  if (game.status === "pre") {
+    return (
+      <div className="flex min-w-0 flex-col items-center px-2 text-center">
+        <p className="font-display text-t5 leading-[var(--ks-leading-5)] tracking-display tabular sm:text-t6">
+          {formatTime(game.start)}
+        </p>
+        <p className="mt-0.5 text-t1 uppercase tracking-label text-subtle">ET</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-w-0 flex-col items-center px-2 text-center">
+      <p
+        className={cn(
+          "font-display text-t5 leading-[var(--ks-leading-6)] tracking-display tabular sm:text-t6",
+          muted && "text-muted",
+        )}
+      >
+        <span className={cn(done && game.away.winner && "text-fg")}>{away}</span>
+        <span className="mx-1.5 text-subtle">–</span>
+        <span className={cn(done && game.home.winner && "text-fg")}>{home}</span>
+      </p>
+      <p className={cn("mt-0.5 text-t1 uppercase tracking-label", live ? "text-ok" : "text-subtle")}>
+        {live ? game.statusText : done ? "Final" : formatKick(game.start)}
+      </p>
+    </div>
+  );
+}
+
+function OddsRow({ game }: { game: Game }) {
+  const spread = game.odds?.spread ?? game.odds?.details;
+  const total = game.odds?.total ? game.odds.total.replace(/^o/i, "") : undefined;
+  const ml =
+    game.odds?.awayMl || game.odds?.homeMl
+      ? `${game.odds.awayMl ?? "—"} / ${game.odds.homeMl ?? "—"}`
+      : undefined;
+  if (!spread && !total && !ml) return null;
+  return (
+    <p className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-t2 text-accent-muted">
+      {spread ? <span>Spread {spread}</span> : null}
+      {total ? <span>O/U {total}</span> : null}
+      {ml ? <span>ML {ml}</span> : null}
+    </p>
+  );
+}
+
+export function GameCard({
+  game,
+  featured,
+  nextUp,
+}: {
+  game: Game;
+  featured?: boolean;
+  nextUp?: boolean;
+}) {
+  const followedSlugs = useFollows((s) => s.slugs);
+  const live = game.status === "in";
+  const done = game.status === "post";
+  const followed = isFollowedGame(game, followedSlugs);
+  const highlightNext = Boolean(nextUp) && !live && !done;
 
   return (
     <article
       className={cn(
-        "bg-surface p-4 shadow-[var(--shadow-border)]",
-        featured ? "rounded-lg p-5 sm:p-6" : "rounded-md",
+        "score-card bg-surface shadow-[var(--shadow-border)]",
+        featured ? "rounded-lg p-4 sm:p-5" : "rounded-md p-4",
+        done && "text-muted",
+        live && "border-l-2 border-l-ok",
+        followed && !live && "ring-1 ring-accent/40",
+        highlightNext && "bg-accent-soft ring-1 ring-accent/50",
       )}
-      style={pa ? ({ borderLeft: `3px solid ${pa.color}` } as CSSProperties) : undefined}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted">
+        <p className="text-t1 font-semibold uppercase tracking-label text-subtle">
           {game.league}
           {game.broadcast ? ` · ${game.broadcast}` : ""}
         </p>
         {live ? (
-          <Badge variant="live">Live · {game.statusText}</Badge>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="live-dot inline-block h-2 w-2 rounded-full bg-ok" aria-hidden />
+            <Badge variant="live">Live · {game.statusText}</Badge>
+          </span>
         ) : done ? (
-          <Badge variant="final">{game.statusText}</Badge>
+          <Badge variant="final">{game.statusText || "Final"}</Badge>
+        ) : highlightNext ? (
+          <Badge variant="watch">Next up</Badge>
         ) : (
           <Badge variant="outline">{formatKick(game.start)}</Badge>
         )}
       </div>
-      {featured ? (
-        <p className="mb-3 font-display text-xl leading-tight tracking-wide sm:text-2xl">{matchupLine(game)}</p>
-      ) : null}
-      <div className={cn("space-y-2.5", featured && "space-y-3")}>
-        <Side {...game.away} muted={done && !game.away.winner} big={featured} />
-        <Side {...game.home} muted={done && !game.home.winner} big={featured} />
+
+      <div className="flex items-center gap-2 sm:gap-3">
+        <TeamCol side={game.away} muted={done && !game.away.winner} align="left" />
+        <CenterScore game={game} muted={done} />
+        <TeamCol side={game.home} muted={done && !game.home.winner} align="right" />
       </div>
-      {game.odds || game.venue ? (
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-3 text-xs text-muted">
-          {game.odds?.spread || game.odds?.details ? (
-            <span className="font-medium text-fg">{game.odds.spread ?? game.odds.details}</span>
-          ) : null}
-          {game.odds?.total ? <span>O/U {game.odds.total.replace(/^o/i, "")}</span> : null}
-          {game.odds?.awayMl || game.odds?.homeMl ? (
-            <span>
-              ML {game.odds.awayMl ?? "—"} / {game.odds.homeMl ?? "—"}
-            </span>
-          ) : null}
-          {game.venue ? <span className="truncate">{game.venue}</span> : null}
-        </div>
+
+      <OddsRow game={game} />
+
+      {game.venue ? (
+        <p className="mt-2 truncate text-center text-t1 text-subtle">{game.venue}</p>
       ) : null}
-      {featured && live ? (
-        <p className="mt-3 text-sm font-medium text-accent">Live now · {game.statusText}</p>
-      ) : null}
-      {featured && !live && !done ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-sm bg-primary px-3 py-2.5 text-primary-fg">
-          <p className="text-xs font-semibold uppercase tracking-widest">Watch</p>
-          <p className="text-sm font-medium">
-            {watch || formatKick(game.start)}
-            {game.broadcast ? ` · ${game.broadcast}` : ""}
-          </p>
-        </div>
-      ) : null}
-      <div className="mt-3 flex flex-wrap gap-4 border-t border-border pt-2 text-sm">
-        <Link to="/game" search={{ date: game.dateKey, id: game.id }} className="inline-flex min-h-11 items-center font-semibold underline">Game details</Link>
-        {game.status === 'pre' && !/postpon|cancel|tbd/i.test(game.statusText) ? <button type="button" className="min-h-11 underline" onClick={() => downloadGameCalendar(game)}>Add to calendar</button> : null}
+
+      <div className="mt-3 flex flex-wrap justify-center gap-4 border-t border-border pt-2 text-t2">
+        <Link
+          to="/game"
+          search={{ date: game.dateKey, id: game.id }}
+          className="inline-flex min-h-11 items-center font-semibold underline"
+        >
+          Game details
+        </Link>
+        {game.status === "pre" && !/postpon|cancel|tbd/i.test(game.statusText) ? (
+          <button type="button" className="min-h-11 underline" onClick={() => downloadGameCalendar(game)}>
+            Add to calendar
+          </button>
+        ) : null}
       </div>
     </article>
   );
