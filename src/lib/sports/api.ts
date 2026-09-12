@@ -51,7 +51,9 @@ export const generateBrief = createServerFn({ method: 'POST' })
   }).parse(input))
   .handler(async ({ data }) => {
     const { requireAiAccess } = await import('../publishing/runtime.server'); const userId = await requireAiAccess();
-    const { writeBrief, loadToday, loadNews } = await import('./server'); const { applyView } = await import('./filter');
+    const { loadToday, loadNews } = await import('./server');
+    const { writeBrief } = await import('./write-brief');
+    const { applyView } = await import('./filter');
     const [board, news] = await Promise.all([loadToday(data.date), loadNews()]);
     if (board.warnings?.length) return { ok: false as const, error: 'Feeds are delayed. Please wait for fresh data before generating a recap.' };
     const games = applyView([...board.games, ...board.upcoming.slice(0, 6)], data.region, data.sport, data.followed, true);
@@ -93,6 +95,6 @@ export const runAutoRecap = createServerFn({ method: "POST" })
     const env = runtime() as unknown as Record<string, unknown>;
     const expected = typeof env.KEYSTONE_AUTO_RECAP_SECRET === "string" ? env.KEYSTONE_AUTO_RECAP_SECRET : "";
     if (!expected || !secretsEqual(provided, expected)) throw new Error(RECAP_SECRET_DENIED_ERROR);
-    const { autoRecapDraft } = await import("./server");
+    const { autoRecapDraft } = await import("./auto-recap");
     return autoRecapDraft(data.date);
   });

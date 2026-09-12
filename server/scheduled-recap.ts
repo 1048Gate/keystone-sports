@@ -1,5 +1,5 @@
 import { definePlugin } from "nitro";
-import { autoRecapDraft } from "../src/lib/sports/server";
+import { autoRecapDraft } from "../src/lib/sports/auto-recap";
 
 export default definePlugin((nitroApp) => {
   nitroApp.hooks.hook("cloudflare:scheduled", async () => {
