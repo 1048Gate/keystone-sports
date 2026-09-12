@@ -76,7 +76,7 @@ function StreakMark({ raw }: { raw: string }) {
   return (
     <span
       className={cn(
-        "inline-flex min-w-8 justify-center rounded-sm px-1.5 py-0.5 font-display text-t1 tracking-label",
+        "inline-flex min-w-8 justify-center rounded-pill px-1.5 py-0.5 font-display text-t1 tracking-label",
         parsed.kind === "W" && "bg-ok/15 text-ok",
         parsed.kind === "L" && "bg-badge-breaking/15 text-badge-breaking",
         parsed.kind === "T" && "bg-elevated text-muted",
@@ -178,7 +178,7 @@ function StandingsPage() {
                             className={cn(
                               "border-t border-border",
                               r.slug && "border-l-2 border-l-accent",
-                              leader && "bg-accent-soft",
+                              leader && "bg-amber-500/10",
                             )}
                           >
                             <td className="p-2">
@@ -210,7 +210,8 @@ function StandingsPage() {
           })}
         </div>
       ) : null}
-      <p className="mt-8 text-xs text-subtle">Lines are for information only. 21+ · If you gamble, call 1-800-GAMBLER.</p>
+      <p className="mt-8 text-xs text-subtle">Showing PA regional team divisions. Records reset for 2026 season.</p>
+      <p className="mt-2 text-xs text-subtle">Lines are for information only. 21+ · If you gamble, call 1-800-GAMBLER.</p>
     </div>
   );
 }
