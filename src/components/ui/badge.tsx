@@ -9,7 +9,7 @@ const badgeVariants = cva(
       variant: {
         default: "bg-elevated text-muted",
         live: "bg-live text-live-fg",
-        final: "bg-primary text-primary-fg",
+        final: "bg-elevated text-muted",
         outline: "border border-border text-muted",
         ok: "bg-ok/15 text-ok",
         breaking: "bg-badge-breaking text-badge-breaking-fg",
