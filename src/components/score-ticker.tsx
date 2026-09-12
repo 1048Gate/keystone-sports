@@ -19,7 +19,7 @@ function TickerItem({ game }: { game: Game }) {
   const slug = game.paSlugs[0];
   const inner = (
     <>
-      <img data-logo src={game.away.logo} alt="" className="h-6 w-6 object-contain" />
+      <img data-logo src={game.away.logo} alt="" width={24} height={24} decoding="async" className="h-6 w-6 object-contain" />
       <span className="font-display text-sm tracking-wide">
         {game.away.abbr}
         {game.status !== "pre" && game.away.score ? (
@@ -27,7 +27,7 @@ function TickerItem({ game }: { game: Game }) {
         ) : null}
       </span>
       <span className="text-xs text-scoreboard-fg/40">@</span>
-      <img data-logo src={game.home.logo} alt="" className="h-6 w-6 object-contain" />
+      <img data-logo src={game.home.logo} alt="" width={24} height={24} decoding="async" className="h-6 w-6 object-contain" />
       <span className="font-display text-sm tracking-wide">
         {game.home.abbr}
         {game.status !== "pre" && game.home.score ? (
