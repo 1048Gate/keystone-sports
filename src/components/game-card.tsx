@@ -7,12 +7,18 @@ import { isFollowedGame } from "@/lib/sports/filter";
 import { useFollows } from "@/lib/sports/follow-store";
 import { downloadGameCalendar } from "@/lib/sports/calendar";
 
-function Logo({ side, size }: { side: GameSide; size: "sm" | "lg" }) {
+function Logo({ side, size, priority }: { side: GameSide; size: "sm" | "lg"; priority?: boolean }) {
+  const dim = size === "lg" ? 56 : 40;
   const img = (
     <img
       data-logo
       src={side.logo}
       alt={side.slug ? "" : side.name}
+      width={dim}
+      height={dim}
+      decoding="async"
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : "low"}
       className={cn("object-contain", size === "lg" ? "h-12 w-12 sm:h-14 sm:w-14" : "h-10 w-10")}
     />
   );
@@ -29,10 +35,10 @@ function Logo({ side, size }: { side: GameSide; size: "sm" | "lg" }) {
   );
 }
 
-function TeamCol({ side, muted, align }: { side: GameSide; muted?: boolean; align: "left" | "right" }) {
+function TeamCol({ side, muted, align, priority }: { side: GameSide; muted?: boolean; align: "left" | "right"; priority?: boolean }) {
   return (
     <div className={cn("flex min-w-0 flex-1 flex-col gap-1", align === "right" ? "items-end" : "items-start")}>
-      <Logo side={side} size="sm" />
+      <Logo side={side} size="sm" priority={priority} />
       <p
         className={cn(
           "max-w-full truncate font-display text-t2 tracking-display",
@@ -145,9 +151,9 @@ export function GameCard({
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        <TeamCol side={game.away} muted={done && !game.away.winner} align="left" />
+        <TeamCol side={game.away} muted={done && !game.away.winner} align="left" priority={featured} />
         <CenterScore game={game} muted={done} />
-        <TeamCol side={game.home} muted={done && !game.home.winner} align="right" />
+        <TeamCol side={game.home} muted={done && !game.home.winner} align="right" priority={featured} />
       </div>
 
       <OddsRow game={game} />
