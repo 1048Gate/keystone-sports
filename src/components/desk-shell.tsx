@@ -2,6 +2,7 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { CalendarDays, ListOrdered, Newspaper, Shield, Table2, Trophy } from "lucide-react";
 import { ScoreTicker } from "@/components/score-ticker";
+import { ResponsibleGamblingNote } from "@/components/responsible-gambling-note";
 import { teamsByFollowed } from "@/data/teams";
 import { useDesk } from "@/lib/sports/desk-store";
 import { useFollows } from "@/lib/sports/follow-store";
@@ -128,7 +129,7 @@ export function DeskShell({ children }: { children: ReactNode }) {
                 <span>A Two Hounds Run site</span>
               </a>
             </div>
-            <p>Lines are for information only. 21+ · If you gamble, call 1-800-GAMBLER.</p>
+            <ResponsibleGamblingNote />
           </div>
         </div>
       </footer>
