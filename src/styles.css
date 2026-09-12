@@ -1,5 +1,5 @@
 /* Drop-in replacement for src/styles.css
-   Phase 0 dark desk tokens + existing Keystone utilities. */
+   Phase 0 dark desk — steel chrome on navy. Color is for badges and logos. */
 
 @import "tailwindcss";
 
@@ -15,17 +15,18 @@
   --ks-elevated: var(--ks-navy-700);
   --ks-overlay: color-mix(in oklab, var(--ks-navy-950) 72%, transparent);
 
-  --ks-fg: #f4f1ea;
-  --ks-muted: #a8b0be;
-  --ks-subtle: #6e7787;
+  --ks-fg: #e6edf4;
+  --ks-muted: #9aa8b6;
+  --ks-subtle: #6d7a88;
 
   --ks-border: color-mix(in oklab, var(--ks-fg) 12%, transparent);
   --ks-border-strong: color-mix(in oklab, var(--ks-fg) 22%, transparent);
 
-  --ks-accent: #e8b84a;
-  --ks-accent-hover: #f0c462;
-  --ks-accent-muted: #8f6f28;
-  --ks-accent-fg: #14110a;
+  /* Steel chrome — team-neutral. Color stays on badges + logos only. */
+  --ks-accent: #9eb4c6;
+  --ks-accent-hover: #b7c8d6;
+  --ks-accent-muted: #6d8496;
+  --ks-accent-fg: #0a0e16;
   --ks-accent-soft: color-mix(in oklab, var(--ks-accent) 16%, transparent);
 
   --ks-badge-breaking: #f0522e;
