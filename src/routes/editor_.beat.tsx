@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { getSiteAccess } from "@/lib/publishing/api";
-import { getBeatAdminDesk, mutateBeatItem, createBeatItem, discoverBeatCandidates } from "@/lib/beat/api";
+import { getBeatAdminDesk, createBeatItem, discoverBeatCandidates, type BeatDeskPayload } from "@/lib/beat/api";
 import {
   BEAT_CATEGORIES,
   BEAT_CATEGORY_LABELS,
   SOURCE_TIER_LABELS,
   type BeatCategory,
   type BeatItem,
+  type BeatMutationInput,
   type SourceTier,
 } from "@/lib/beat/types";
 import { Button } from "@/components/ui/button";
@@ -15,8 +16,82 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { TEAMS } from "@/data/teams";
 
+type SiteAccess = {
+  signedIn: boolean;
+  admin: boolean;
+  adminConfigured: boolean;
+  aiEnabled: boolean;
+};
+
+type ProtectedDeskResponse = {
+  ok: boolean;
+  access?: SiteAccess;
+  desk?: BeatDeskPayload;
+  error?: string;
+};
+
+async function readJsonResponse(response: Response): Promise<Record<string, unknown>> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (response.redirected || !contentType.toLowerCase().includes("application/json")) {
+    throw new Error("Cloudflare Access session missing on this action. Reload /editor/beat while signed in as the owner, then try again.");
+  }
+  return (await response.json()) as Record<string, unknown>;
+}
+
+async function loadProtectedBeatDesk(): Promise<{ access: SiteAccess; desk: BeatDeskPayload }> {
+  const response = await fetch("/editor/api/beat/desk", {
+    method: "GET",
+    credentials: "same-origin",
+    headers: { Accept: "application/json" },
+  });
+  const body = (await readJsonResponse(response)) as ProtectedDeskResponse;
+  if (!response.ok || !body.ok || !body.access || !body.desk) {
+    throw new Error(body.error || "Could not load the Beat desk.");
+  }
+  return { access: body.access, desk: body.desk };
+}
+
+async function mutateBeatItemViaAccess(data: BeatMutationInput): Promise<void> {
+  const response = await fetch("/editor/api/beat/mutate", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(data),
+  });
+  const body = await readJsonResponse(response);
+  if (!response.ok || body.ok !== true) {
+    throw new Error(typeof body.error === "string" ? body.error : "Beat action failed.");
+  }
+}
+
+/** Surface serverFn / Access failures clearly (opaque HTML redirects, serialized errors). */
+function beatActionErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    const msg = error.message.trim();
+    // Access challenge often returns HTML login page as the thrown text.
+    if (
+      /cf-access|cloudflare\s+access|attention required/i.test(msg) ||
+      (/<!doctype html/i.test(msg) && /access/i.test(msg))
+    ) {
+      return "Cloudflare Access session missing on this action. Reload /editor/beat while signed in as the owner, then try again.";
+    }
+    if (/only the configured owner/i.test(msg) || /sign in as the site owner/i.test(msg)) {
+      return `${msg} If the desk loaded but Approve fails, reload while signed into Access so the admin cookie covers server actions.`;
+    }
+    return msg;
+  }
+  if (typeof error === "string" && error.trim()) return error.trim();
+  if (error && typeof error === "object") {
+    const rec = error as Record<string, unknown>;
+    if (typeof rec.message === "string" && rec.message.trim()) return rec.message.trim();
+    if (typeof rec.error === "string" && rec.error.trim()) return rec.error.trim();
+  }
+  return "Action failed. Check your Cloudflare Access session and try again.";
+}
+
 export const Route = createFileRoute("/editor_/beat")({
   loader: async () => {
+    if (typeof window !== "undefined") return loadProtectedBeatDesk();
     const access = await getSiteAccess();
     const desk = access.admin
       ? await getBeatAdminDesk()
@@ -35,8 +110,8 @@ export const Route = createFileRoute("/editor_/beat")({
 
 function BeatEditorPage() {
   const { access, desk } = Route.useLoaderData();
-  const router = useRouter();
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"ok" | "error">("ok");
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -53,7 +128,7 @@ function BeatEditorPage() {
     expiresAt: "",
   });
 
-  const rows = desk.adminItems ?? [];
+  const [rows, setRows] = useState(desk.adminItems ?? []);
   const visible = useMemo(() => {
     if (filter === "all") return rows;
     return rows.filter((r) => r.approvalStatus === filter);
@@ -83,19 +158,26 @@ function BeatEditorPage() {
     );
   }
 
-  async function refresh(msg: string) {
-    setMessage(msg);
-    await router.invalidate();
+  async function refresh(msg?: string) {
+    if (msg) {
+      setMessageTone("ok");
+      setMessage(msg);
+    }
+    const fresh = await loadProtectedBeatDesk();
+    setRows(fresh.desk.adminItems ?? []);
   }
 
   async function run(action: () => Promise<unknown>, ok: string) {
     setBusy(true);
     setMessage("");
+    setMessageTone("ok");
     try {
       await action();
-      await refresh(ok);
+      await refresh(ok || undefined);
+      if (ok) setMessageTone("ok");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Action failed.");
+      setMessageTone("error");
+      setMessage(beatActionErrorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -113,7 +195,7 @@ function BeatEditorPage() {
         D1-backed candidate queue. Approve is manual only — discovery never auto-publishes. Public strip flag:{" "}
         <code>KEYSTONE_BEAT_M1</code> ({desk.enabled ? "on" : "off"}). Storage: {desk.source}.
       </p>
-      {message ? <p className="mt-3 text-sm text-accent">{message}</p> : null}
+      {message ? <p className={`mt-3 rounded-md px-3 py-2 text-sm ${messageTone === "error" ? "bg-red-950/40 text-red-200 ring-1 ring-red-500/40" : "text-accent"}`} role={messageTone === "error" ? "alert" : "status"}>{message}</p> : null}
 
       <div className="mt-6 flex flex-wrap gap-2">
         {(["pending", "approved", "rejected", "all"] as const).map((key) => (
@@ -141,6 +223,7 @@ function BeatEditorPage() {
           onClick={() =>
             void run(async () => {
               const result = await discoverBeatCandidates({ data: { dryRun: true, perAccountLimit: 2 } });
+              setMessageTone("ok");
               setMessage(`Dry-run: ${result.candidates.length} candidates, ${result.skippedDuplicates} dupes.`);
             }, "")
           }
@@ -176,10 +259,10 @@ function BeatEditorPage() {
                   {item.expiresAt ? ` · expires ${item.expiresAt}` : ""}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button type="button" size="sm" disabled={busy || item.approvalStatus === "approved"} onClick={() => void run(() => mutateBeatItem({ data: { id: item.id, action: "approve", expiresAt: item.expiresAt ?? undefined } }), "Approved.")}>
+                  <Button type="button" size="sm" disabled={busy || item.approvalStatus === "approved"} onClick={() => void run(() => mutateBeatItemViaAccess({ id: item.id, action: "approve", expiresAt: item.expiresAt ?? undefined }), "Approved.")}>
                     Approve
                   </Button>
-                  <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void run(() => mutateBeatItem({ data: { id: item.id, action: "reject" } }), "Rejected.")}>
+                  <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void run(() => mutateBeatItemViaAccess({ id: item.id, action: "reject" }), "Rejected.")}>
                     Reject
                   </Button>
                   <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setPreviewId(item.id)}>
@@ -193,7 +276,7 @@ function BeatEditorPage() {
                     onClick={() => {
                       const next = window.prompt("Keystone context (1–3 sentences)", item.context ?? "");
                       if (next == null) return;
-                      void run(() => mutateBeatItem({ data: { id: item.id, action: "edit_context", context: next } }), "Context updated.");
+                      void run(() => mutateBeatItemViaAccess({ id: item.id, action: "edit_context", context: next }), "Context updated.");
                     }}
                   >
                     Edit context
@@ -207,8 +290,8 @@ function BeatEditorPage() {
                       onChange={(e) =>
                         void run(
                           () =>
-                            mutateBeatItem({
-                              data: { id: item.id, action: "change_category", category: e.target.value as BeatCategory },
+                            mutateBeatItemViaAccess({
+                              id: item.id, action: "change_category", category: e.target.value as BeatCategory,
                             }),
                           "Category updated.",
                         )
@@ -228,7 +311,7 @@ function BeatEditorPage() {
                     disabled={busy}
                     onClick={() =>
                       void run(
-                        () => mutateBeatItem({ data: { id: item.id, action: item.pinned ? "unpin" : "pin" } }),
+                        () => mutateBeatItemViaAccess({ id: item.id, action: item.pinned ? "unpin" : "pin" }),
                         item.pinned ? "Unpinned." : "Pinned.",
                       )
                     }
@@ -245,8 +328,8 @@ function BeatEditorPage() {
                       if (next == null) return;
                       void run(
                         () =>
-                          mutateBeatItem({
-                            data: { id: item.id, action: "set_expiration", expiresAt: next.trim() ? next.trim() : null },
+                          mutateBeatItemViaAccess({
+                            id: item.id, action: "set_expiration", expiresAt: next.trim() ? next.trim() : null,
                           }),
                         "Expiration updated.",
                       );

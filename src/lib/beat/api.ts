@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import type { BeatItem, PublicBeatItem, BeatCategory } from "./types";
-import { BEAT_CATEGORIES } from "./types";
+import type { BeatItem, PublicBeatItem } from "./types";
 import { selectPublicBeatItems } from "./order";
 import { readBeatM1Flag } from "./flag";
 import { classifyBeatMedia, normalizeBeatUrl } from "./allowlist";
@@ -97,45 +96,10 @@ const mutateSchema = z.object({
 export const mutateBeatItem = createServerFn({ method: "POST" })
   .validator((input) => mutateSchema.parse(input))
   .handler(async ({ data }) => {
-    const { db, requireAdmin, identity } = await import("../publishing/runtime.server");
+    const { db, requireAdmin } = await import("../publishing/runtime.server");
     const adminId = requireAdmin();
-    const database = db();
-    const { patchBeatItem, getBeatItemById } = await import("./db.server");
-    const existing = await getBeatItemById(database, data.id);
-    if (!existing) throw new Error("Beat item not found.");
-
-    const now = new Date().toISOString();
-    if (data.action === "approve") {
-      if (existing.category === "breaking" && !existing.expiresAt && data.expiresAt == null) {
-        throw new Error("Breaking items require an expiration before approve.");
-      }
-      await patchBeatItem(database, data.id, {
-        approvalStatus: "approved",
-        approvedBy: identity().id ?? adminId,
-        approvedAt: now,
-        expiresAt: data.expiresAt !== undefined ? data.expiresAt : existing.expiresAt ?? null,
-      });
-    } else if (data.action === "reject") {
-      await patchBeatItem(database, data.id, {
-        approvalStatus: "rejected",
-        approvedBy: null,
-        approvedAt: null,
-      });
-    } else if (data.action === "pin") {
-      await patchBeatItem(database, data.id, { pinned: true });
-    } else if (data.action === "unpin") {
-      await patchBeatItem(database, data.id, { pinned: false });
-    } else if (data.action === "set_expiration") {
-      if (data.expiresAt === undefined) throw new Error("expiresAt required.");
-      await patchBeatItem(database, data.id, { expiresAt: data.expiresAt });
-    } else if (data.action === "edit_context") {
-      if (data.context === undefined) throw new Error("context required.");
-      await patchBeatItem(database, data.id, { context: data.context });
-    } else if (data.action === "change_category") {
-      if (!data.category || !BEAT_CATEGORIES.includes(data.category)) throw new Error("category required.");
-      await patchBeatItem(database, data.id, { category: data.category as BeatCategory });
-    }
-    return { ok: true as const, id: data.id };
+    const { mutateBeatItemForAdmin } = await import("./mutate.server");
+    return mutateBeatItemForAdmin(db(), adminId, data);
   });
 
 const createSchema = z.object({

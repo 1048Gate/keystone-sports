@@ -1,6 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { CalendarDays, ListOrdered, Newspaper, NotebookPen, Shield, Table2, Trophy } from "lucide-react";
+import { CalendarDays, ListOrdered, Newspaper, Shield, Table2, Trophy } from "lucide-react";
 import { ScoreTicker } from "@/components/score-ticker";
 import { teamsByFollowed } from "@/data/teams";
 import { useDesk } from "@/lib/sports/desk-store";
@@ -23,7 +23,6 @@ const TABS = [
   { to: "/odds", label: "Odds", icon: Table2 },
   { to: "/news", label: "News", icon: Newspaper },
   { to: "/teams", label: "Teams", icon: Shield },
-  { to: "/desk", label: "Notes", icon: NotebookPen },
 ] as const;
 
 function KeystoneMark({ className }: { className?: string }) {
@@ -81,15 +80,6 @@ export function DeskShell({ children }: { children: ReactNode }) {
                 </Link>
               );
             })}
-            <Link
-              to="/desk"
-              className={cn(
-                "ml-2 inline-flex h-10 items-center rounded-sm border border-border bg-surface px-3 text-sm font-medium",
-                pathname.startsWith("/desk") ? "border-primary text-fg" : "text-muted hover:text-fg",
-              )}
-            >
-              My Notes
-            </Link>
           </nav>
         </div>
         </header>
@@ -105,9 +95,6 @@ export function DeskShell({ children }: { children: ReactNode }) {
                 A small Pennsylvania desk — Philly, Pittsburgh, and the colleges. Scores, lines, and the beat, written
                 like the sports page, not a dashboard.
               </p>
-              <Link to="/desk" className="mt-3 inline-block text-sm font-medium text-fg underline-offset-2 hover:underline">
-                My Notes
-              </Link>
             </div>
             <div className="grid grid-cols-2 gap-x-10 gap-y-2 sm:grid-cols-3">
               {footerTeams.map((t) => (
@@ -146,7 +133,7 @@ export function DeskShell({ children }: { children: ReactNode }) {
         </div>
       </footer>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden">
-        <div className="grid grid-cols-7">
+        <div className="grid grid-cols-6">
           {TABS.map((item) => {
             const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
             const Icon = item.icon;
