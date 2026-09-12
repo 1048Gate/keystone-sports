@@ -23,7 +23,7 @@ function TeamCard({ slug }: { slug: string }) {
         params={{ slug: t.slug }}
         className="flex min-w-0 flex-1 items-center gap-4"
       >
-        <img data-logo src={teamLogo(t)} alt="" className="h-12 w-12 object-contain" />
+        <img data-logo src={teamLogo(t)} alt="" width={48} height={48} loading="lazy" decoding="async" className="h-12 w-12 object-contain" />
         <div className="min-w-0">
           <p className="font-display text-xl tracking-wide">{t.shortName}</p>
           <p className="text-sm text-muted">

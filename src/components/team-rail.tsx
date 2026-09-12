@@ -24,7 +24,7 @@ export function TeamRail() {
               {on ? (
                 <Star className="absolute top-1 right-1 h-3 w-3 fill-current text-accent" aria-hidden />
               ) : null}
-              <img data-logo src={teamLogo(t)} alt="" className="h-8 w-8 object-contain" />
+              <img data-logo src={teamLogo(t)} alt="" width={32} height={32} loading="lazy" decoding="async" className="h-8 w-8 object-contain" />
               <span className="w-full truncate text-center text-xs font-medium text-muted">{t.shortName}</span>
             </Link>
           );
