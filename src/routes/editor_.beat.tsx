@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { TEAMS } from "@/data/teams";
 
-export const Route = createFileRoute("/editor/beat")({
+export const Route = createFileRoute("/editor_/beat")({
   loader: async () => {
     const access = await getSiteAccess();
     const desk = access.admin
