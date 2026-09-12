@@ -179,7 +179,7 @@ function StandingsPage() {
                             className={cn(
                               "border-t border-border",
                               r.slug && "border-l-2 border-l-accent",
-                              leader && "bg-amber-500/10",
+                              leader && "bg-accent-soft",
                             )}
                           >
                             <td className="p-2">
