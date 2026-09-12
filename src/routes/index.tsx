@@ -9,6 +9,7 @@ import { ArrowRight, Copy, PenLine, RefreshCw } from "lucide-react";
 import { FilterChips } from "@/components/filter-chips";
 import { GameCard, GameRow } from "@/components/game-card";
 import { WeekStrip } from "@/components/week-strip";
+import { FadeSwap } from "@/components/fade-swap";
 import { PendingScreen } from "@/components/pending-screen";
 import { RouteError } from "@/components/route-error";
 
@@ -294,12 +295,14 @@ function TodayPage() {
           {waitingFollows ? (
             <div className="mt-5 h-40 animate-pulse rounded-md bg-elevated" aria-hidden />
           ) : feature ? (
-            <div className="mt-5">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted">
-                {featuredLabel(feature)}
-              </p>
-              <GameCard game={feature} featured nextUp={feature.status === "pre" && isFollowedGame(feature, followed)} />
-            </div>
+            <FadeSwap id={`feature-${date}-${feature.id}`}>
+              <div className="mt-5">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted">
+                  {featuredLabel(feature)}
+                </p>
+                <GameCard game={feature} featured nextUp={feature.status === "pre" && isFollowedGame(feature, followed)} />
+              </div>
+            </FadeSwap>
           ) : null}
           <PublishedUpdates date={date} />
         </div>
@@ -318,11 +321,13 @@ function TodayPage() {
           />
 
           {waitingFollows ? null : rest.length ? (
-            <div className={cn("grid gap-3 sm:grid-cols-2", feature ? "mt-4" : "mt-6")}>
-              {rest.map((g) => (
-                <GameCard key={g.id} game={g} />
-              ))}
-            </div>
+            <FadeSwap id={`slate-${date}-${board.generatedAt}`}>
+              <div className={cn("grid gap-3 sm:grid-cols-2", feature ? "mt-4" : "mt-6")}>
+                {rest.map((g) => (
+                  <GameCard key={g.id} game={g} />
+                ))}
+              </div>
+            </FadeSwap>
           ) : !feature ? (
             <div className="mt-6 rounded-md bg-surface px-5 py-10 text-center shadow-[var(--shadow-border)]">
               <p className="font-display text-2xl">
