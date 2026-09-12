@@ -12,7 +12,7 @@ function Logo({ side, size }: { side: GameSide; size: "sm" | "lg" }) {
     <img
       data-logo
       src={side.logo}
-      alt=""
+      alt={side.slug ? "" : side.name}
       className={cn("object-contain", size === "lg" ? "h-12 w-12 sm:h-14 sm:w-14" : "h-10 w-10")}
     />
   );
