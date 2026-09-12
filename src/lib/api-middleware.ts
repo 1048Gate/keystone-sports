@@ -89,8 +89,17 @@ function validateIngestCandidates(candidates: unknown[]): string[] {
     if (typeof obj.authorAccount === 'string' && obj.authorAccount.length > MAX_ACCOUNT_LEN) {
       errors.push(`Candidate ${i}: authorAccount exceeds ${MAX_ACCOUNT_LEN} chars`);
     }
-    if (typeof obj.embedUrl === 'string' && obj.embedUrl.length > MAX_URL_LEN) {
-      errors.push(`Candidate ${i}: embedUrl exceeds ${MAX_URL_LEN} chars`);
+    if (typeof obj.embedUrl === 'string') {
+      if (obj.embedUrl.length > MAX_URL_LEN) {
+        errors.push(`Candidate ${i}: embedUrl exceeds ${MAX_URL_LEN} chars`);
+      }
+      // embedUrl must also be valid https
+      try {
+        const eu = new URL(obj.embedUrl);
+        if (eu.protocol !== 'https:') errors.push(`Candidate ${i}: embedUrl must be https`);
+      } catch {
+        errors.push(`Candidate ${i}: embedUrl is not a valid URL`);
+      }
     }
     if (typeof obj.oembedHtml === 'string' && obj.oembedHtml.length > MAX_OEMBED_HTML_LEN) {
       errors.push(`Candidate ${i}: oembedHtml exceeds ${MAX_OEMBED_HTML_LEN} chars`);
@@ -196,7 +205,7 @@ export const apiMiddleware = createMiddleware({ type: 'request' }).server(async 
       return json(INGEST_INVALID_CONTENT_TYPE, 415);
     }
 
-    // --- Body size cap ---
+    // --- Body size cap (Content-Length header check) ---
     const contentLength = Number(request.headers.get('content-length') ?? 0);
     if (contentLength > MAX_BODY_BYTES) return json(INGEST_BATCH_TOO_LARGE, 413);
 
@@ -204,10 +213,20 @@ export const apiMiddleware = createMiddleware({ type: 'request' }).server(async 
       const { db } = await import('@/lib/publishing/runtime.server');
       const { ingestPendingCandidates, loadNewsUrlsForDedupe } = await import('@/lib/beat/ingest.server');
 
+      // --- Read body as text first, then enforce hard size cap ---
+      // Content-Length can be missing or spoofed; this is the authoritative check.
+      let bodyText: string;
+      try {
+        bodyText = await request.text();
+      } catch {
+        return json(INGEST_INVALID_JSON, 400);
+      }
+      if (bodyText.length > MAX_BODY_BYTES) return json(INGEST_BATCH_TOO_LARGE, 413);
+
       // --- Parse JSON safely ---
       let body: unknown;
       try {
-        body = await request.json();
+        body = JSON.parse(bodyText);
       } catch {
         return json(INGEST_INVALID_JSON, 400);
       }

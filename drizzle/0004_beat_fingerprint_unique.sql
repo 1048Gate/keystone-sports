@@ -23,7 +23,8 @@ WHERE `duplicate_fingerprint` IS NOT NULL
           PARTITION BY `duplicate_fingerprint`
           ORDER BY
             CASE WHEN `approval_status` = 'approved' THEN 0 ELSE 1 END,
-            `created_at` ASC
+            `created_at` ASC,
+            `id` ASC
         ) AS `rn`
       FROM `beat_items`
       WHERE `duplicate_fingerprint` IS NOT NULL

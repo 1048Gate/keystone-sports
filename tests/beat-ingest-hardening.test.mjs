@@ -138,7 +138,11 @@ test('Worker write.ts does not silently fall back to D1 on HTTP failure', () => 
     'Worker must not have automatic D1 fallback comment',
   );
   // The default path when secret is set must NOT fall back to D1.
-  assert.match(writeSrc, /HTTP ingest is the only path/);
+  assert.match(writeSrc, /HTTP ingest is the primary write path/);
+  // Missing secret must fail closed, not fall back to D1.
+  assert.match(writeSrc, /INGEST_NOT_CONFIGURED/);
+  // Fallback must inspect httpResult.path, not rely on a catch block.
+  assert.match(writeSrc, /httpResult\.path !== "failed"/);
 });
 
 test('Worker write.ts uses AbortController for HTTP timeout', () => {
@@ -166,7 +170,9 @@ test('Worker write.ts makes D1 fallback explicit and disabled by default', () =>
   assert.match(writeSrc, /allowD1Fallback/);
   // When ingest secret is configured and fallback is not enabled,
   // the only path is HTTP ingest.
-  assert.match(writeSrc, /HTTP ingest is the only path/);
+  assert.match(writeSrc, /HTTP ingest is the primary write path/);
+  // Missing secret must fail closed.
+  assert.match(writeSrc, /INGEST_NOT_CONFIGURED/);
 });
 
 test('Worker types.ts includes new config fields', () => {

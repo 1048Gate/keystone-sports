@@ -239,15 +239,16 @@ async function writeViaD1(env: Env, candidates: BeatCandidate[]): Promise<WriteR
 /**
  * Prefer HTTP ingest with KEYSTONE_BEAT_INGEST_SECRET (narrow permissions).
  *
- * If the ingest secret is configured, HTTP ingest is the ONLY write path.
- * HTTP failures (auth, validation, timeout, network) do NOT fall back to D1.
+ * If the ingest secret is configured, HTTP ingest is the primary write path.
+ * HTTP failures (auth, validation, timeout, network) do NOT fall back to D1
+ * unless KEYSTONE_ALLOW_DIRECT_D1_FALLBACK=true is explicitly set.
  *
- * Direct D1 writes are only used when:
- *   1. No ingest secret is configured, OR
- *   2. KEYSTONE_ALLOW_DIRECT_D1_FALLBACK=true is explicitly set (dev/emergency).
+ * If no ingest secret is configured, the function fails closed with
+ * INGEST_NOT_CONFIGURED unless KEYSTONE_ALLOW_DIRECT_D1_FALLBACK=true.
  *
- * This ensures the authenticated HTTP boundary is authoritative — a failed
- * ingest request cannot bypass validation by writing directly to D1.
+ * This ensures the authenticated HTTP boundary is authoritative — a missing
+ * secret or a failed ingest request cannot bypass validation by writing
+ * directly to D1.
  */
 export async function writePendingCandidates(
   env: Env,
@@ -255,7 +256,7 @@ export async function writePendingCandidates(
 ): Promise<WriteResult> {
   if (candidates.length === 0) {
     return {
-      path: env.KEYSTONE_BEAT_INGEST_SECRET ? "http_ingest" : "d1_direct",
+      path: env.KEYSTONE_BEAT_INGEST_SECRET ? "http_ingest" : "failed",
       pendingWritten: 0,
       skippedDuplicates: 0,
       discarded: 0,
@@ -268,22 +269,37 @@ export async function writePendingCandidates(
   const allowD1Fallback =
     (env.KEYSTONE_ALLOW_DIRECT_D1_FALLBACK || "").trim().toLowerCase() === "true";
 
-  if (ingestSecret) {
-    // HTTP ingest is the only path when the secret is configured,
-    // unless explicit D1 fallback is enabled.
-    if (!allowD1Fallback) {
-      return await writeViaHttpIngest(ingestSecret, candidates, resolveTimeout(env));
+  if (!ingestSecret) {
+    // No ingest secret configured: fail closed unless explicit D1 fallback.
+    if (allowD1Fallback) {
+      return writeViaD1(env, candidates);
     }
-    // Explicit fallback mode: try HTTP first, fall back to D1 on failure.
-    try {
-      return await writeViaHttpIngest(ingestSecret, candidates, resolveTimeout(env));
-    } catch {
-      // Unexpected exception from writeViaHttpIngest (should not happen —
-      // it catches internally and returns a WriteResult). Fall back to D1.
-      return await writeViaD1(env, candidates);
-    }
+    return {
+      path: "failed",
+      pendingWritten: 0,
+      skippedDuplicates: 0,
+      discarded: 0,
+      errors: ["INGEST_NOT_CONFIGURED"],
+      items: [],
+    };
   }
 
-  // No ingest secret configured: use direct D1 (dev/local mode).
-  return writeViaD1(env, candidates);
+  // Ingest secret is configured: HTTP ingest is the primary path.
+  const httpResult = await writeViaHttpIngest(
+    ingestSecret,
+    candidates,
+    resolveTimeout(env),
+  );
+
+  if (httpResult.path !== "failed") {
+    return httpResult;
+  }
+
+  // HTTP ingest failed. Only fall back to D1 if explicitly enabled.
+  if (allowD1Fallback) {
+    return writeViaD1(env, candidates);
+  }
+
+  // No fallback: return the failed HTTP result.
+  return httpResult;
 }

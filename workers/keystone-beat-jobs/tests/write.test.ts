@@ -73,8 +73,8 @@ describe("writePendingCandidates", () => {
     globalThis.fetch = originalFetch;
   });
 
-  describe("no D1 fallback on HTTP failure", () => {
-    it("returns failed result (not d1_direct) when HTTP returns 401", async () => {
+  describe("no D1 fallback when fallback disabled (secret configured)", () => {
+    it("returns failed (not d1_direct) when HTTP returns 401", async () => {
       globalThis.fetch = (async () =>
         new Response(JSON.stringify({ ok: false, code: "AUTH_FAILED" }), {
           status: 401,
@@ -94,7 +94,7 @@ describe("writePendingCandidates", () => {
       assert.match(result.errors[0], /INGEST_REJECTED/);
     });
 
-    it("returns failed result (not d1_direct) when HTTP returns 422", async () => {
+    it("returns failed (not d1_direct) when HTTP returns 422", async () => {
       globalThis.fetch = (async () =>
         new Response(JSON.stringify({ ok: false, code: "VALIDATION_FAILED" }), {
           status: 422,
@@ -112,7 +112,7 @@ describe("writePendingCandidates", () => {
       assert.equal(result.pendingWritten, 0);
     });
 
-    it("returns failed result (not d1_direct) when HTTP returns 500", async () => {
+    it("returns failed (not d1_direct) when HTTP returns 500", async () => {
       globalThis.fetch = (async () =>
         new Response(JSON.stringify({ ok: false, code: "INGEST_UNAVAILABLE" }), {
           status: 500,
@@ -164,21 +164,139 @@ describe("writePendingCandidates", () => {
         KEYSTONE_BEAT_INGEST_SECRET: "test-secret",
       } as Env;
 
-      await writePendingCandidates(env, [makeCandidate()]);
+      const result = await writePendingCandidates(env, [makeCandidate()]);
 
+      assert.equal(result.path, "failed", "path must be exactly 'failed', not 'd1_direct'");
       assert.equal(d1WriteCount, 0, "D1 must not be written when HTTP fails and fallback is disabled");
     });
   });
 
-  describe("timeout handling", () => {
-    it("returns INGEST_TIMEOUT when fetch is aborted", async () => {
+  describe("D1 fallback when KEYSTONE_ALLOW_DIRECT_D1_FALLBACK=true (secret configured)", () => {
+    it("falls back to D1 on HTTP 401 when fallback is enabled", async () => {
+      let d1WriteCount = 0;
+      const mockDb = makeMockDb();
+      mockDb.prepare = (sql: string) => ({
+        bind: (..._vals: unknown[]) => ({
+          first: async <T = Record<string, unknown>>(): Promise<T | null> => {
+            if (/original_url = \?/.test(sql) && /duplicate_fingerprint = \?/.test(sql)) {
+              return null;
+            }
+            return null;
+          },
+          all: async <T = Record<string, unknown>>() => ({ results: [] as T[] }),
+          run: async () => { d1WriteCount += 1; return {}; },
+        }),
+        first: async <T = Record<string, unknown>>(): Promise<T | null> => null,
+        all: async <T = Record<string, unknown>>() => ({ results: [] as T[] }),
+        run: async () => { d1WriteCount += 1; return {}; },
+      });
+
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify({ ok: false, code: "AUTH_FAILED" }), {
+          status: 401,
+          headers: { "content-type": "application/json" },
+        })) as typeof fetch;
+
+      const env = {
+        DB: mockDb as unknown as D1Database,
+        KEYSTONE_BEAT_INGEST_SECRET: "test-secret",
+        KEYSTONE_ALLOW_DIRECT_D1_FALLBACK: "true",
+      } as Env;
+
+      const result = await writePendingCandidates(env, [makeCandidate()]);
+
+      assert.equal(result.path, "d1_direct", "path must be exactly 'd1_direct' when fallback is enabled and HTTP fails");
+      assert.ok(d1WriteCount > 0, "D1 must be written when fallback is enabled and HTTP fails");
+    });
+
+    it("falls back to D1 on HTTP 500 when fallback is enabled", async () => {
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify({ ok: false, code: "INGEST_UNAVAILABLE" }), {
+          status: 500,
+          headers: { "content-type": "application/json" },
+        })) as typeof fetch;
+
+      const env = {
+        DB: makeMockDb() as unknown as D1Database,
+        KEYSTONE_BEAT_INGEST_SECRET: "test-secret",
+        KEYSTONE_ALLOW_DIRECT_D1_FALLBACK: "true",
+      } as Env;
+
+      const result = await writePendingCandidates(env, [makeCandidate()]);
+
+      assert.equal(result.path, "d1_direct", "path must be exactly 'd1_direct' when fallback is enabled and HTTP 500");
+    });
+
+    it("falls back to D1 on network error when fallback is enabled", async () => {
+      globalThis.fetch = (async () => {
+        throw new TypeError("fetch failed");
+      }) as typeof fetch;
+
+      const env = {
+        DB: makeMockDb() as unknown as D1Database,
+        KEYSTONE_BEAT_INGEST_SECRET: "test-secret",
+        KEYSTONE_ALLOW_DIRECT_D1_FALLBACK: "true",
+      } as Env;
+
+      const result = await writePendingCandidates(env, [makeCandidate()]);
+
+      assert.equal(result.path, "d1_direct", "path must be exactly 'd1_direct' when fallback is enabled and network error");
+    });
+
+    it("falls back to D1 on timeout when fallback is enabled", async () => {
       globalThis.fetch = (async (_url: string, opts: RequestInit) => {
-        // Simulate abort via the signal
         const signal = opts.signal as AbortSignal;
         if (signal) {
-          // Immediately abort
-          const controller = new AbortController();
-          controller.abort();
+          throw new DOMException("Aborted", "AbortError");
+        }
+        throw new Error("No signal");
+      }) as typeof fetch;
+
+      const env = {
+        DB: makeMockDb() as unknown as D1Database,
+        KEYSTONE_BEAT_INGEST_SECRET: "test-secret",
+        KEYSTONE_ALLOW_DIRECT_D1_FALLBACK: "true",
+        KEYSTONE_INGEST_TIMEOUT_MS: "3000",
+      } as Env;
+
+      const result = await writePendingCandidates(env, [makeCandidate()]);
+
+      assert.equal(result.path, "d1_direct", "path must be exactly 'd1_direct' when fallback is enabled and timeout");
+    });
+  });
+
+  describe("no ingest secret configured", () => {
+    it("fails closed with INGEST_NOT_CONFIGURED when fallback is disabled", async () => {
+      const env = {
+        DB: makeMockDb() as unknown as D1Database,
+      } as Env;
+
+      const result = await writePendingCandidates(env, [makeCandidate()]);
+
+      assert.equal(result.path, "failed", "path must be exactly 'failed' when no secret and no fallback");
+      assert.equal(result.pendingWritten, 0);
+      assert.equal(result.errors.length, 1);
+      assert.equal(result.errors[0], "INGEST_NOT_CONFIGURED");
+    });
+
+    it("uses D1 directly when no secret but KEYSTONE_ALLOW_DIRECT_D1_FALLBACK=true", async () => {
+      const env = {
+        DB: makeMockDb() as unknown as D1Database,
+        KEYSTONE_ALLOW_DIRECT_D1_FALLBACK: "true",
+      } as Env;
+
+      const result = await writePendingCandidates(env, [makeCandidate()]);
+
+      assert.equal(result.path, "d1_direct", "path must be exactly 'd1_direct' when no secret but fallback enabled");
+      assert.ok(result.pendingWritten > 0, "should have written at least one candidate");
+    });
+  });
+
+  describe("timeout handling (fallback disabled)", () => {
+    it("returns INGEST_TIMEOUT when fetch is aborted", async () => {
+      globalThis.fetch = (async (_url: string, opts: RequestInit) => {
+        const signal = opts.signal as AbortSignal;
+        if (signal) {
           throw new DOMException("Aborted", "AbortError");
         }
         throw new Error("No signal");
@@ -265,15 +383,20 @@ describe("writePendingCandidates", () => {
       assert.equal(result.path, "http_ingest");
       assert.equal(result.pendingWritten, 1);
     });
-  });
 
-  describe("D1 fallback opt-in", () => {
-    it("falls back to D1 when KEYSTONE_ALLOW_DIRECT_D1_FALLBACK=true", async () => {
+    it("does not fall back to D1 on HTTP success even with fallback enabled", async () => {
       globalThis.fetch = (async () =>
-        new Response(JSON.stringify({ ok: false, code: "AUTH_FAILED" }), {
-          status: 401,
-          headers: { "content-type": "application/json" },
-        })) as typeof fetch;
+        new Response(
+          JSON.stringify({
+            ok: true,
+            inserted: 1,
+            skippedDuplicates: 0,
+            discarded: 0,
+            errors: [],
+            items: [{ originalUrl: "https://x.com/Eagles/status/1234567890123456789", relevanceScore: 85 }],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        )) as typeof fetch;
 
       const env = {
         DB: makeMockDb() as unknown as D1Database,
@@ -283,30 +406,12 @@ describe("writePendingCandidates", () => {
 
       const result = await writePendingCandidates(env, [makeCandidate()]);
 
-      // With fallback enabled, a 401 from HTTP will return a failed WriteResult
-      // (since writeViaHttpIngest catches internally). The fallback path would
-      // only be triggered by an unexpected throw, but the key point is that
-      // the path is "failed" (not "d1_direct") for HTTP-level rejections.
-      // D1 fallback only kicks in for unexpected exceptions.
-      assert.ok(
-        result.path === "failed" || result.path === "d1_direct",
-        `Expected failed or d1_direct, got ${result.path}`,
-      );
-    });
-
-    it("uses D1 directly when no ingest secret is configured", async () => {
-      const env = {
-        DB: makeMockDb() as unknown as D1Database,
-      } as Env;
-
-      const result = await writePendingCandidates(env, [makeCandidate()]);
-
-      assert.equal(result.path, "d1_direct");
+      assert.equal(result.path, "http_ingest", "should not fall back to D1 when HTTP succeeds");
     });
   });
 
   describe("empty candidates", () => {
-    it("returns zero result for empty candidate list", async () => {
+    it("returns http_ingest with zero result for empty list (secret configured)", async () => {
       const env = {
         DB: makeMockDb() as unknown as D1Database,
         KEYSTONE_BEAT_INGEST_SECRET: "test-secret",
@@ -317,6 +422,16 @@ describe("writePendingCandidates", () => {
       assert.equal(result.pendingWritten, 0);
       assert.equal(result.errors.length, 0);
       assert.equal(result.path, "http_ingest");
+    });
+
+    it("returns failed for empty list when no secret configured (fail closed)", async () => {
+      const env = {
+        DB: makeMockDb() as unknown as D1Database,
+      } as Env;
+
+      const result = await writePendingCandidates(env, []);
+
+      assert.equal(result.path, "failed", "empty list with no secret should fail closed");
     });
   });
 });
