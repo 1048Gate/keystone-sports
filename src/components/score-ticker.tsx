@@ -37,12 +37,12 @@ function TickerItem({ game }: { game: Game }) {
       <span
         className={cn(
           "ml-1 text-xs font-semibold uppercase tracking-wide",
-          live ? "text-accent" : "text-scoreboard-fg/50",
+          live ? "text-ok" : "text-scoreboard-fg/50",
         )}
       >
         {live ? (
           <>
-            <span className="live-dot mr-1 inline-block h-1.5 w-1.5 rounded-full bg-accent" />
+            <span className="live-dot mr-1 inline-block h-1.5 w-1.5 rounded-full bg-ok" />
             {game.statusText}
           </>
         ) : done ? (
