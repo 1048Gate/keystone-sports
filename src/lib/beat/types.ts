@@ -19,6 +19,14 @@ export type ApprovalStatus = "pending" | "approved" | "rejected" | "expired";
 
 export type ApprovalMode = "manual" | "automatic";
 
+export type BeatMutationInput = {
+  id: string;
+  action: "approve" | "reject" | "pin" | "unpin" | "set_expiration" | "edit_context" | "change_category";
+  context?: string;
+  category?: BeatCategory;
+  expiresAt?: string | null;
+};
+
 export type BeatItem = {
   id: string;
   source: string;

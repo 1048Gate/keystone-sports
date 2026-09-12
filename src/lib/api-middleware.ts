@@ -148,6 +148,77 @@ export const apiMiddleware = createMiddleware({ type: 'request' }).server(async 
   const { pathname, searchParams } = url;
   const method = request.method.toUpperCase();
 
+  // Browser-facing Beat admin endpoints live under /editor so Cloudflare Access
+  // injects the authenticated owner email. Public TanStack serverFns stay on
+  // their default path and remain available to signed-out visitors.
+  if (pathname === '/editor/api/beat/desk') {
+    if (method !== 'GET') return json({ ok: false, error: 'GET only.' }, 405);
+    const { db, identity, runtime: readRuntime } = await import('@/lib/publishing/runtime.server');
+    const user = identity();
+    if (!user.id) return json({ ok: false, error: 'Cloudflare Access identity is missing.' }, 401);
+    if (!user.admin) return json({ ok: false, error: 'Only the configured owner can review Beat cards.' }, 403);
+    try {
+      const { listBeatItems, listPublicBeatRows } = await import('@/lib/beat/db.server');
+      const { selectPublicBeatItems } = await import('@/lib/beat/order');
+      const { readBeatM1Flag } = await import('@/lib/beat/flag');
+      const database = db();
+      const [adminItems, publicRows] = await Promise.all([
+        listBeatItems(database),
+        listPublicBeatRows(database),
+      ]);
+      return json({
+        ok: true,
+        access: {
+          signedIn: true,
+          admin: true,
+          adminConfigured: user.adminConfigured,
+          aiEnabled: readRuntime().KEYSTONE_AI_ENABLED === 'true' && Boolean(readRuntime().AI_API_KEY),
+        },
+        desk: {
+          enabled: readBeatM1Flag(readRuntime() as unknown as Record<string, unknown>),
+          generatedAt: new Date().toISOString(),
+          items: selectPublicBeatItems(publicRows),
+          adminItems,
+          source: 'd1',
+        },
+      });
+    } catch {
+      return json({ ok: false, error: 'The Beat desk is temporarily unavailable.' }, 500);
+    }
+  }
+
+  if (pathname === '/editor/api/beat/mutate') {
+    if (method !== 'POST') return json({ ok: false, error: 'POST only.' }, 405);
+    const contentType = request.headers.get('content-type') ?? '';
+    if (!contentType.toLowerCase().includes('application/json')) {
+      return json({ ok: false, error: 'Content-Type must be application/json.' }, 415);
+    }
+    const { db, requireAdmin } = await import('@/lib/publishing/runtime.server');
+    let adminId: string;
+    try {
+      adminId = requireAdmin();
+    } catch {
+      return json({ ok: false, error: 'Cloudflare Access owner identity is missing.' }, 401);
+    }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: 'Invalid JSON.' }, 400);
+    }
+    try {
+      const { mutateBeatItemForAdmin } = await import('@/lib/beat/mutate.server');
+      return json(await mutateBeatItemForAdmin(db(), adminId, body));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message === 'Beat item not found.') return json({ ok: false, error: message }, 404);
+      if (/required|invalid|expiration|too_big|too_small/i.test(message)) {
+        return json({ ok: false, error: message || 'Invalid Beat action.' }, 422);
+      }
+      return json({ ok: false, error: 'The Beat action failed.' }, 500);
+    }
+  }
+
   if (pathname === '/api/auto-recap') {
     if (queryHasSecret(searchParams)) return json({ ok: false, error: RECAP_SECRET_URL_ERROR }, 400);
     const secret = secretFromHeaders(request.headers);

@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { TEAM_BY_SLUG } from "@/data/teams";
 import { getMonthBoard, getNewsFeed, getTodayBoard, generateBrief } from "@/lib/sports/api";
 import { rememberBoard } from "@/lib/sports/board-cache";
-import { useDesk } from "@/lib/sports/desk-store";
 import { useFollows } from "@/lib/sports/follow-store";
 import { applyView, featuredLabel, humanKicker, pickFeatured, rankPaNews } from "@/lib/sports/filter";
 import { parseRegion, readPrefs, writePrefs } from "@/lib/sports/prefs";
@@ -118,22 +117,8 @@ function TodayPage() {
   const sport = search.sport ?? "all";
   const today = dateKeyNY();
 
-  const noteMap = useDesk((s) => s.notes);
-  const featuredNote = useDesk((s) => s.featured);
-  const allPicks = useDesk((s) => s.picks);
-  const allEvents = useDesk((s) => s.events);
-  const deskHydrated = useDesk((s) => s.hydrated);
   const followed = useFollows((s) => s.slugs);
   const followHydrated = useFollows((s) => s.hydrated);
-  const note = deskHydrated ? (noteMap[date] ?? "") : "";
-  const picks = useMemo(
-    () => (deskHydrated ? allPicks.filter((p) => p.date === date) : []),
-    [deskHydrated, allPicks, date],
-  );
-  const custom = useMemo(
-    () => (deskHydrated ? allEvents.filter((e) => e.date === date) : []),
-    [deskHydrated, allEvents, date],
-  );
 
   useEffect(() => {
     setBoard(loader.board);
@@ -170,7 +155,7 @@ function TodayPage() {
     return () => { active = false; clearInterval(t); };
   }, [date]);
 
-  useEffect(() => { setBrief(null); setBriefError(null); }, [date, region, sport, note]);
+  useEffect(() => { setBrief(null); setBriefError(null); }, [date, region, sport]);
 
   const waitingFollows = region === "following" && !followHydrated;
   const games = useMemo(
@@ -255,7 +240,6 @@ function TodayPage() {
       const res = await generateBrief({
         data: {
           date,
-          note,
           region, sport, followed,
         },
       });
@@ -330,7 +314,6 @@ function TodayPage() {
           {desk.lede ? <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted">{desk.lede}</p> : null}
           <div className="mt-3 flex flex-wrap gap-3 text-sm">
             {followed.length ? <button className="font-semibold text-accent underline" onClick={() => patch({ region: 'following' })}>My Teams ({followed.length})</button> : <Link to="/teams" className="font-semibold text-accent underline">Choose your teams</Link>}
-            <Link to="/desk" className="underline">My Notes</Link>
           </div>
           <FeedStatus at={board.generatedAt} warnings={board.warnings} />
           <WeekStrip
@@ -378,26 +361,6 @@ function TodayPage() {
             onRegion={(id) => patch({ region: id })}
             onSport={(id) => patch({ sport: id })}
           />
-
-          {custom.length ? (
-            <div className="mt-6 rounded-md border border-dashed border-border-strong bg-surface p-4">
-              <p className="text-xs font-semibold uppercase tracking-wider text-accent">Your private notes</p>
-              <ul className="mt-2 space-y-2">
-                {custom.map((e) => (
-                  <li key={e.id}>
-                    <p className="font-semibold">
-                      {e.time ? `${e.time} · ` : ""}
-                      {e.title}
-                    </p>
-                    <p className="text-sm text-muted">
-                      {e.sport}
-                      {e.notes ? ` — ${e.notes}` : ""}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
 
           {waitingFollows ? null : rest.length ? (
             <div className={cn("grid gap-3 sm:grid-cols-2", feature ? "mt-4" : "mt-6")}>
@@ -499,37 +462,16 @@ function TodayPage() {
             </section>
           ) : null}
 
-          {featuredNote || note || picks.length ? (
-            <section className="rounded-md bg-surface p-5 shadow-[var(--shadow-border)]">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted">Your private notes</p>
-                <Link to="/desk" className="text-sm text-muted hover:text-fg">
-                  Edit
-                </Link>
-              </div>
-              {featuredNote ? <p className="mt-3 text-sm leading-relaxed">{featuredNote}</p> : null}
-              {note ? <p className="mt-3 text-sm leading-relaxed text-muted">{note}</p> : null}
-              {picks.map((p) => (
-                <div key={p.id} className="mt-3 border-t border-border pt-3">
-                  <p className="font-semibold">{p.title}</p>
-                  <p className="text-sm text-accent">{p.pick}</p>
-                  {p.notes ? <p className="text-sm text-muted">{p.notes}</p> : null}
-                </div>
-              ))}
-            </section>
-          ) : null}
-
           <section className="rounded-md bg-surface p-5 shadow-[var(--shadow-border)]">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">Column</p>
             <h2 className="mt-1 font-display text-2xl tracking-wide">Today's take</h2>
             <p className="mt-2 text-sm text-muted">
-              An AI-assisted recap from dated scores and headlines. Your private note is included only when you choose to generate. Check the sources before sharing.
+              An AI-assisted recap from dated scores and headlines. Check the sources before sharing.
             </p>
             <Button className="mt-4 w-full" onClick={() => void runBrief()} disabled={busy || !aiAccess.aiEnabled || !aiAccess.signedIn}>
               <PenLine className="h-4 w-4" />
               {busy ? "Writing…" : !aiAccess.aiEnabled ? "Recaps not enabled yet" : "Write the recap"}
             </Button>
-            {aiAccess.aiEnabled && !aiAccess.signedIn ? <p className="mt-2 text-sm text-muted">Owner AI unlocks after Cloudflare Access sign-in.</p> : null}
             {briefError ? <p className="mt-3 text-sm text-danger">{briefError}</p> : null}
             {brief ? (
               <div className="mt-4 space-y-3 border-t border-border pt-4 text-sm leading-relaxed text-fg">

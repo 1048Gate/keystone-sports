@@ -166,9 +166,7 @@ export default defineConfig(({ command, isPreview }) => ({
     // PWA head + ?install=1 tutorial page; runs before Start/Nitro.
     grokPwaPlugin(),
     tailwindcss(),
-    // Serve serverFns under /editor/_serverFn so Cloudflare Access (/editor*)
-    // injects cf-access-authenticated-user-email on admin POSTs (Approve/Reject).
-    tanstackStart({ serverFns: { base: '/editor/_serverFn' } }),
+    tanstackStart(),
     ...(command === "build" || isPreview
       ? [
           nitro({
