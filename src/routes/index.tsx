@@ -8,6 +8,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Copy, PenLine, RefreshCw } from "lucide-react";
 import { FilterChips } from "@/components/filter-chips";
 import { GameCard, GameRow } from "@/components/game-card";
+import { WeekStrip } from "@/components/week-strip";
 import { PendingScreen } from "@/components/pending-screen";
 import { RouteError } from "@/components/route-error";
 
@@ -18,9 +19,9 @@ import { TEAM_BY_SLUG } from "@/data/teams";
 import { getMonthBoard, getNewsFeed, getTodayBoard, generateBrief } from "@/lib/sports/api";
 import { rememberBoard } from "@/lib/sports/board-cache";
 import { useFollows } from "@/lib/sports/follow-store";
-import { applyView, featuredLabel, humanKicker, pickFeatured, rankPaNews } from "@/lib/sports/filter";
+import { applyView, featuredLabel, humanKicker, isFollowedGame, pickFeatured, rankPaNews } from "@/lib/sports/filter";
 import { parseRegion, readPrefs, writePrefs } from "@/lib/sports/prefs";
-import { addDays, dateKeyNY, formatKick, formatLongDate, relativeWhen, weekdayShort } from "@/lib/sports/time";
+import { addDays, dateKeyNY, formatKick, formatLongDate, relativeWhen } from "@/lib/sports/time";
 import type { NewsItem } from "@/lib/sports/types";
 import { cn } from "@/lib/utils";
 
@@ -53,50 +54,6 @@ export const Route = createFileRoute("/")({
   }),
   component: TodayPage,
 });
-
-function WeekStrip({
-  origin,
-  selected,
-  counts,
-  liveDays,
-  onSelect,
-}: {
-  origin: string;
-  selected: string;
-  counts: Record<string, number>;
-  liveDays: Set<string>;
-  onSelect: (date: string) => void;
-}) {
-  const days = Array.from({ length: 7 }, (_, i) => addDays(origin, i));
-  return (
-    <div className="no-scrollbar -mx-1 mt-5 flex gap-1.5 overflow-x-auto px-1 pb-1">
-      {days.map((key, i) => {
-        const active = key === selected;
-        const n = counts[key] ?? 0;
-        const live = liveDays.has(key);
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onSelect(key)}
-            className={cn(
-              "flex h-16 min-w-16 shrink-0 flex-col items-center justify-center rounded-md border px-3",
-              active ? "border-primary bg-primary text-primary-fg" : "border-border bg-surface text-fg hover:bg-elevated",
-            )}
-          >
-            <span className={cn("text-xs font-semibold uppercase tracking-wider", active ? "text-primary-fg/80" : "text-muted")}>
-              {i === 0 ? "Today" : weekdayShort(key)}
-            </span>
-            <span className="font-display text-lg leading-none">{Number(key.slice(8))}</span>
-            <span className={cn("mt-0.5 text-xs uppercase tracking-wide", live ? "text-accent" : active ? "text-primary-fg/70" : "text-subtle")}>
-              {live ? "Live" : n ? `${n}` : "—"}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 function TodayPage() {
   const search = Route.useSearch();
@@ -189,12 +146,10 @@ function TodayPage() {
   const moreNews = rankedNews.filter((a) => a.id !== lead?.id).slice(0, 6);
 
   const weekSource = useMemo(() => [...board.games, ...board.upcoming], [board.games, board.upcoming]);
-  const weekCounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    const viewed = applyView(weekSource, region, sport, followed, followHydrated);
-    for (const g of viewed) map[g.dateKey] = (map[g.dateKey] ?? 0) + 1;
-    return map;
-  }, [weekSource, region, sport, followed, followHydrated]);
+  const weekGames = useMemo(
+    () => applyView(weekSource, region, sport, followed, followHydrated),
+    [weekSource, region, sport, followed, followHydrated],
+  );
   const liveDays = useMemo(() => {
     const set = new Set<string>();
     for (const g of weekSource) if (g.status === "in") set.add(g.dateKey);
@@ -319,7 +274,7 @@ function TodayPage() {
           <WeekStrip
             origin={today}
             selected={date}
-            counts={weekCounts}
+            games={weekGames}
             liveDays={liveDays}
             onSelect={(d) => patch({ date: d })}
           />
@@ -343,7 +298,7 @@ function TodayPage() {
               <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted">
                 {featuredLabel(feature)}
               </p>
-              <GameCard game={feature} featured />
+              <GameCard game={feature} featured nextUp={feature.status === "pre" && isFollowedGame(feature, followed)} />
             </div>
           ) : null}
           <PublishedUpdates date={date} />
