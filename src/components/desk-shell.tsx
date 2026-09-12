@@ -124,6 +124,7 @@ export function DeskShell({ children }: { children: ReactNode }) {
                   alt=""
                   width={28}
                   height={28}
+                  decoding="async"
                   className="h-7 w-7 rounded-full opacity-90"
                 />
                 <span>A Two Hounds Run site</span>

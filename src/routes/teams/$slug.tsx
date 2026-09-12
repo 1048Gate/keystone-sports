@@ -95,7 +95,7 @@ function TeamPage() {
       ) : null}
       <section className="border-b border-border bg-surface">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-5 px-4 py-8 sm:px-6">
-          <img data-logo src={teamLogo(team)} alt="" className="h-16 w-16 object-contain sm:h-20 sm:w-20" />
+          <img data-logo src={teamLogo(team)} alt="" width={80} height={80} decoding="async" className="h-16 w-16 object-contain sm:h-20 sm:w-20" />
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">
               {team.league} · {team.city}
